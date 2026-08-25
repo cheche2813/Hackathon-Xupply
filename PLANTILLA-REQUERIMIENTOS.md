@@ -49,7 +49,6 @@ Marca lo que SÍ entra en el MVP (lo mínimo para la Demo Day) y lo que sería "
 | Funcionalidad                                                    | ¿MVP? | ¿Extra? | Responsable        |
 | ---------------------------------------------------------------- | :---: | :-----: | ------------------ |
 | Registro e inicio de sesión                                      |   ✅   |         | Backend            |
-| modelo vista controlador                                         |   ✅   |         | Backend            |
 | Gestión básica del perfil del restaurante                        |   ✅   |         | Backend            |
 | Gestión básica del perfil del proveedor                          |   ✅   |         | Backend            |
 | Formulario de registro de productos del proveedor                |   ✅   |         | Backend            |
@@ -63,13 +62,11 @@ Marca lo que SÍ entra en el MVP (lo mínimo para la Demo Day) y lo que sería "
 | Consulta del estado del pedido                                   |   ✅   |         | Frontend / Backend |
 | Historial de pedidos                                             |   ✅   |         | Backend            |
 | Gestión básica de inventario                                     |   ✅   |         | Backend            |
-| Dashboard básico de pedidos y operaciones                        |   ✅   |         | Frontend / Backend |
 | Notificaciones de cambios en los pedidos                         |       |    ✅    | Backend            |
 | Calificación de proveedores                                      |       |    ✅    | Frontend / Backend |
 | Facturación electrónica                                          |       |    ✅    | Backend            |
 | Envío automático de facturas por correo                          |       |    ✅    | Backend            |
 | Gestión avanzada de inventario y alertas de stock                |       |    ✅    | Backend            |
-| Rastreo GPS de transportadores                                   |       |    ✅    | Backend / Frontend |
 | Visualización de rutas de entrega                                |       |    ✅    | Frontend / Backend |
 | Optimización de rutas                                            |       |    ✅    | Backend            |
 | Zupply IA básica                                                 |       |    ✅    | Backend / IA       |
@@ -77,8 +74,6 @@ Marca lo que SÍ entra en el MVP (lo mínimo para la Demo Day) y lo que sería "
 | Predicción de inventario con IA                                  |       |    ✅    | Backend / IA       |
 | Generación de reportes con IA                                    |       |    ✅    | Backend / IA       |
 | Plan Básico, Medio y Premium                                     |       |    ✅    | Backend / Frontend |
-| Integración de pagos para los planes                             |       |    ✅    | Backend            |
-| Gestión de mantenimiento y soporte                               |       |    ✅    | Backend            |
 
 
 > Regla: si algo no está en el MVP, **no se construye hasta terminar el MVP**. Primero lo esencial.
@@ -89,104 +84,22 @@ Marca lo que SÍ entra en el MVP (lo mínimo para la Demo Day) y lo que sería "
 
 Deben cubrir **los mínimos del curso**. Marquen qué usarán:
 
-- [X] **Frontend:** HTML5/CSS3/JS/TS, React 19 (Vite + Tailwind), Node.js + Express..
+- [X] **Frontend:** HTML5/TS, React 19 (Vite + Tailwind), Node.js + Express..
 - [X] **Backend:** Node.js + Express + TypeScript: 13 routers, ~37 endpoints REST (server/src/routes/).
 - [X] **Base de datos:** PostgreSQL (database/zupply_schema_postgresql.sql)
-- [X] **Feature clave:**Conexión B2B en tiempo real entre restaurantes y proveedores para consultar productos, realizar pedidos y hacer seguimiento de su estado.
+- [X] **Feature clave:** Websocket 
 - [X] **Tiempo real (Socket.IO):** Sí. Se utilizará para actualizar en tiempo real los estados de los pedidos entre restaurante y proveedor.
-- [X] **Autenticación:** Login con correo y contraseña, utilizando contraseñas protegidas mediante hash y autenticación por sesiones/token. El acceso estará determinado según el rol del usuario.
-- [X] **Otra técnica / API externa:** API de mapas/GPS para futuras funcionalidades de ubicación y seguimiento de transportadores. También se contempla EmailJS para envío de notificaciones y facturas por correo. Esto coincide con las integraciones previstas en el documento de Zupply.
+- [X] **Autenticación:** AWS
+- [X] **Otra técnica / API externa:** Se contempla EmailJS para envío de notificaciones y facturas por correo. Esto coincide con las integraciones previstas en el documento de Zupply.
 
-**Tablas de datos previstas (borrador):**
-```
-usuarios(
-    id,
-    nombre,
-    correo,
-    clave_hash,
-    rol_id,
-    fecha_registro
-)
-
-roles(
-    id,
-    nombre,
-    Nit
-)
-
-restaurantes(
-    id,
-    usuario_id,
-    nombre,
-    direccion,
-    telefono,
-    Nit
-)
-
-proveedores(
-    id,
-    usuario_id,
-    nombre,
-    direccion,
-    telefono,
-    Nit
-)
-
-productos(
-    id,
-    proveedor_id,
-    nombre,
-    descripcion,
-    precio,
-    disponibilidad,
-    imagen
-)
-
-pedidos(
-    id,
-    restaurante_id,
-    proveedor_id,
-    productos_id,
-    fecha,
-    estado,
-    total
-)
-
-detalle_pedido(
-    id,
-    pedido_id,
-    producto_id,
-    cantidad,
-    precio_unitario,
-    subtotal,
-)
-
-inventario(
-    id,
-    restaurante_id,
-    provedor_id
-    producto_id,
-    cantidad,
-    stock_minimo
-)
-
-despachos(
-    id,
-    pedido_id,
-    estado,
-    fecha_despacho,
-    fecha_entrega
-)
-...
-```
 
 ---
 
 ## 5. Requerimientos de despliegue
 
 - **Frontend se desplegará en:** Vercel
-- **Backend se desplegará en:** Superbase
-- **Base de datos:** Superbase
+- **Backend se desplegará en:** SUPABASE
+- **Base de datos:** SUPABASE
 - **Dominio:** Subdominio gratuito proporcionado por Vercel
 - **CI/CD:** Sí. Cada push a la rama configurada ejecutará automáticamente el proceso de despliegue.
 - **Link del proyecto (cuando exista):** Pendiente de despliegue.
@@ -196,11 +109,11 @@ Aunque usemos capas gratuitas para el curso, estimen qué costaría en "producci
 
 | Recurso              | Proveedor / plan                | Costo estimado (mes)         |
 | -------------------- | ------------------------------- | ---------------------------- |
-| Hosting del frontend | Vercel – Plan Pro               | ~30 USD/mes                  |
-| Hosting del backend  | Render – servicio de producción | ~30 USD/mes                  |
-| Base de datos        | postgres gestionado             | ~40 USD/mes                  |
-| Dominio              | Dominio propio                  | ~20–40 USD/año               |
-| **Total estimado**   |                                 | **100 USD/mes + dominio**  |
+| Hosting del frontend | Vercel – Plan Pro               | ~10 USD/mes                  |
+| Hosting del backend  | Render – servicio de producción | ~15 USD/mes                  |
+| Base de datos        | postgres gestionado             | ~15 USD/mes                  |
+| Dominio              | Dominio propio                  | ~10–20 USD/año               |
+| **Total estimado**   |                                 | **50 USD/mes + dominio**  |
 
 
 ---
