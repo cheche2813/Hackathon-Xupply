@@ -109,11 +109,11 @@ Aunque usemos capas gratuitas para el curso, estimen qué costaría en "producci
 
 | Recurso              | Proveedor / plan                | Costo estimado (mes)         |
 | -------------------- | ------------------------------- | ---------------------------- |
-| Hosting del frontend | Vercel – Plan Pro               | ~10 USD/mes                  |
-| Hosting del backend  | Render – servicio de producción | ~15 USD/mes                  |
-| Base de datos        | postgres gestionado             | ~15 USD/mes                  |
-| Dominio              | Dominio propio                  | ~10–20 USD/año               |
-| **Total estimado**   |                                 | **50 USD/mes + dominio**  |
+| Hosting del frontend | Vercel – Plan Pro               | ~0 USD/mes                   |
+| Hosting del backend  | Render – servicio de producción | ~0 USD/mes                   |
+| Base de datos        | Supabase                        | ~0 USD/mes                   |
+| Dominio              | Dominio propio                  | ~10 USD/año                  |
+| **Total estimado**   |                                 | **10 USD/mes + dominio**     |
 
 
 ---
