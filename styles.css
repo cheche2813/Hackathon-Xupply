@@ -32,11 +32,11 @@ html {
 body {
   font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   line-height: 1.6;
-  color: var(--tinta);
+  color: var(--azul-50);
   background:
-    radial-gradient(600px 300px at 85% -50px, rgba(64, 140, 201, 0.16), transparent 60%),
-    radial-gradient(700px 350px at -10% 10%, rgba(64, 140, 201, 0.15), transparent 60%),
-    linear-gradient(180deg, var(--azul-50), var(--blanco) 42%);
+    radial-gradient(600px 320px at 85% -50px, rgba(100, 169, 224, 0.35), transparent 60%),
+    radial-gradient(700px 380px at -10% 10%, rgba(63, 140, 201, 0.25), transparent 60%),
+    linear-gradient(180deg, #0d2440, #0a1d33 45%, #071828 100%);
 }
 
 h1, h2, h3 {
@@ -58,7 +58,14 @@ a {
   }
 
   .boton,
-  .tarjetas article {
+  .tarjetas article,
+  .flujo article {
+    transition: none;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
     transition: none;
   }
 }
@@ -78,8 +85,9 @@ a {
 }
 
 .cabecera {
-  background: var(--blanco);
-  border-bottom: 1px solid var(--azul-100);
+  background: rgba(10, 29, 51, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(100, 169, 224, 0.25);
   position: sticky;
   top: 0;
   z-index: 5;
@@ -103,7 +111,7 @@ nav {
   font-weight: 700;
   font-size: 1.4rem;
   text-decoration: none;
-  color: var(--azul-700);
+  color: var(--blanco);
 }
 
 .logo img {
@@ -122,12 +130,12 @@ nav ul {
 nav a:not(.logo) {
   text-decoration: none;
   font-weight: 500;
-  color: var(--tinta-suave);
+  color: var(--azul-200);
 }
 
 nav a:not(.logo):hover,
 nav a:not(.logo):focus {
-  color: var(--acento-fuerte);
+  color: var(--blanco);
   text-decoration: underline;
 }
 
@@ -155,12 +163,19 @@ nav a:not(.logo):focus {
 
 .hero h1 {
   font-size: clamp(1.9rem, 4.5vw, 3rem);
-  color: var(--azul-800);
+  color: var(--blanco);
   margin-bottom: 1rem;
 }
 
+.hero h1 .resaltar {
+  background: linear-gradient(90deg, var(--azul-300), var(--blanco));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 .hero p {
-  color: var(--tinta-suave);
+  color: var(--azul-100);
   margin-bottom: 1rem;
   max-width: 38em;
 }
@@ -208,14 +223,20 @@ nav a:not(.logo):focus {
 }
 
 .captura {
-  background: linear-gradient(180deg, var(--azul-100), var(--azul-50));
-  border: 2px dashed var(--azul-300);
   border-radius: 16px;
-  min-height: 260px;
-  display: grid;
-  place-items: center;
-  padding: 1.5rem;
-  text-align: center;
+  overflow: hidden;
+  box-shadow: var(--sombra-media);
+  border: 1px solid var(--azul-200);
+  background: #0d2440;
+}
+
+.captura img,
+.captura video {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
 }
 
 .placeholder {
@@ -235,7 +256,7 @@ nav a:not(.logo):focus {
 
 .seccion h2 {
   font-size: clamp(1.5rem, 3vw, 2rem);
-  color: var(--azul-800);
+  color: var(--azul-50);
   margin-bottom: 0.75rem;
 }
 
@@ -249,16 +270,42 @@ nav a:not(.logo):focus {
   background: linear-gradient(90deg, var(--acento), var(--azul-500));
 }
 
-.seccion h3 {
-  color: var(--azul-700);
+.seccion > h3 {
+  color: var(--azul-200);
   margin-bottom: 0.5rem;
 }
 
 .lead {
-  color: var(--tinta-suave);
+  color: var(--azul-100);
   max-width: 60ch;
   margin-bottom: 1.75rem;
 }
+
+.resaltar {
+  background: linear-gradient(90deg, var(--azul-300), var(--blanco));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
+}
+
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: none;
+}
+
+.flujo > li:nth-child(1) { transition-delay: 0s; }
+.flujo > li:nth-child(2) { transition-delay: 0.06s; }
+.flujo > li:nth-child(3) { transition-delay: 0.12s; }
+.flujo > li:nth-child(4) { transition-delay: 0.18s; }
+.flujo > li:nth-child(5) { transition-delay: 0.24s; }
+.flujo > li:nth-child(6) { transition-delay: 0.3s; }
 
 .tarjetas {
   list-style: none;
@@ -277,9 +324,56 @@ nav a:not(.logo):focus {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.tarjetas .icono {
+  display: inline-grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--azul-100), var(--azul-200));
+  border: 1px solid var(--azul-200);
+  color: var(--acento-fuerte);
+  margin-bottom: 1rem;
+}
+
+.tarjetas .icono svg {
+  width: 1.7rem;
+  height: 1.7rem;
+}
+
+.tarjetas article h3 {
+  margin-bottom: 0.5rem;
+}
+
 .tarjetas article p {
   color: var(--tinta-suave);
   font-size: 0.95rem;
+}
+
+.equipo article {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.9rem;
+}
+
+.equipo .foto {
+  width: 6rem;
+  height: 6rem;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--azul-200);
+  box-shadow: var(--sombra);
+}
+
+.equipo .foto.iniciales {
+  display: inline-grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--azul-400), var(--azul-700));
+  color: var(--blanco);
+  font-weight: 700;
+  font-size: 1.5rem;
 }
 
 @media (hover: hover) {
@@ -291,38 +385,78 @@ nav a:not(.logo):focus {
 
 .flujo {
   list-style: none;
-  counter-reset: paso;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  max-width: 72ch;
-}
-
-.flujo li {
-  counter-increment: paso;
-  background: var(--azul-100);
-  border: 1px solid var(--azul-200);
-  border-radius: 999px;
-  padding: 0.6rem 1.1rem 0.6rem 2.4rem;
-  position: relative;
-  font-weight: 600;
-  color: var(--azul-800);
-}
-
-.flujo li::before {
-  content: counter(paso);
-  position: absolute;
-  left: 0.9rem;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 1.4rem;
-  height: 1.4rem;
-  background: var(--azul-600);
-  color: var(--blanco);
-  border-radius: 50%;
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.25rem;
+}
+
+.flujo article {
+  background:
+    radial-gradient(180px 120px at 100% 0%, rgba(63, 140, 201, 0.12), transparent 70%),
+    var(--blanco);
+  border: 1px solid var(--azul-200);
+  border-radius: var(--radio);
+  padding: 1.5rem;
+  height: 100%;
+  box-shadow: var(--sombra);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.flujo-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.flujo .paso {
+  display: inline-grid;
   place-items: center;
-  font-size: 0.75rem;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--azul-500), var(--azul-700));
+  color: var(--blanco);
+  font-weight: 700;
+  font-size: 1.05rem;
+  box-shadow: var(--sombra);
+}
+
+.flujo .flujo-icono {
+  display: inline-grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 12px;
+  background: var(--acento-suave);
+  border: 1px solid var(--azul-200);
+  color: var(--acento-fuerte);
+}
+
+.flujo .flujo-icono svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.flujo article h3 {
+  margin: 0;
+}
+
+.flujo article p {
+  color: var(--tinta-suave);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+@media (hover: hover) {
+  .flujo article:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--sombra-media);
+    border-color: var(--azul-300);
+  }
 }
 
 .listado {
@@ -335,7 +469,7 @@ nav a:not(.logo):focus {
 .listado li {
   break-inside: avoid;
   margin-bottom: 0.5rem;
-  color: var(--tinta-suave);
+  color: var(--azul-100);
 }
 
 @media (max-width: 640px) {
@@ -364,6 +498,18 @@ nav a:not(.logo):focus {
   gap: 0.75rem;
 }
 
+.plan .etiqueta-plan {
+  align-self: flex-start;
+  background: linear-gradient(135deg, var(--azul-500), var(--azul-700));
+  color: var(--blanco);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 999px;
+  padding: 0.25rem 0.8rem;
+}
+
 .plan.destacado {
   border: 2px solid var(--acento);
   box-shadow: var(--sombra-media);
@@ -378,12 +524,11 @@ nav a:not(.logo):focus {
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: 0.35rem 1.5rem;
-  max-width: 55rem;
 }
 
 .stack dt {
   font-weight: 700;
-  color: var(--azul-700);
+  color: var(--azul-200);
   padding-left: 1rem;
   position: relative;
 }
@@ -401,7 +546,7 @@ nav a:not(.logo):focus {
 }
 
 .stack dd {
-  color: var(--tinta-suave);
+  color: var(--azul-100);
   margin-bottom: 0.5rem;
 }
 
@@ -472,6 +617,53 @@ form .boton {
   justify-self: start;
 }
 
+.contacto-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.contacto-datos a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--blanco);
+  border: 1px solid var(--azul-200);
+  border-radius: 10px;
+  padding: 0.6rem 1rem;
+  color: var(--acento-fuerte);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--sombra);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.contacto-datos svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+}
+
+.contacto-datos a:hover,
+.contacto-datos a:focus {
+  transform: translateY(-2px);
+  box-shadow: var(--sombra-media);
+}
+
+.contacto-datos a.red-whatsapp:hover,
+.contacto-datos a.red-whatsapp:focus {
+  background: #25d366;
+  border-color: #25d366;
+  color: var(--blanco);
+}
+
+.contacto-datos a.red-gmail:hover,
+.contacto-datos a.red-gmail:focus {
+  background: #ea4335;
+  border-color: #ea4335;
+  color: var(--blanco);
+}
+
 footer {
   background: linear-gradient(135deg, var(--azul-800), #0d2440);
   color: var(--blanco);
@@ -490,6 +682,32 @@ footer ul {
   list-style: none;
   display: flex;
   gap: 1.25rem;
+}
+
+footer ul.redes {
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+footer .redes a {
+  color: var(--blanco);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 0.4rem 1rem;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+footer .redes a:hover,
+footer .redes a:focus {
+  background: var(--acento);
+  border-color: var(--acento);
+  color: var(--blanco);
+  transform: translateY(-2px);
 }
 
 footer strong {
@@ -522,10 +740,6 @@ footer .placeholder {
 
   .seccion {
     padding: 2.5rem 1rem;
-  }
-
-  .captura {
-    min-height: 200px;
   }
 
   form {
