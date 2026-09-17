@@ -2,12 +2,6 @@
 
 > Plataforma B2B inteligente para restaurantes y proveedores de alimentos en **Bucaramanga, Santander, Colombia**.
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38bdf8.svg)](https://tailwindcss.com/)
-[![Express](https://img.shields.io/badge/Express-4.21-green.svg)](https://expressjs.com/)
-[![MySQL](https://img.shields.io/badge/MySQL-8.0-orange.svg)](https://www.mysql.com/)
-
 ---
 
 ## 🌟 Características Principales
