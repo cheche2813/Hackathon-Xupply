@@ -342,6 +342,7 @@ nav a:not(.logo):focus {
 }
 
 .tarjetas article h3 {
+  color: var(--azul-700);
   margin-bottom: 0.5rem;
 }
 
@@ -442,6 +443,7 @@ nav a:not(.logo):focus {
 }
 
 .flujo article h3 {
+  color: var(--azul-700);
   margin: 0;
 }
 
