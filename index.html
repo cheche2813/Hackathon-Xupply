@@ -4,17 +4,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Xuplly: plataforma B2B que conecta restaurantes y proveedores de alimentos para centralizar y automatizar pedidos, inventario, facturación y logística.">
-  <title>Xuplly — Plataforma B2B para restaurantes y proveedores</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta name="description" content="Xupply: plataforma B2B que conecta restaurantes y proveedores de alimentos para centralizar y automatizar pedidos, inventario, facturación y logística.">
+  <title>Xupply — Plataforma B2B para restaurantes y proveedores</title>
+  <link rel="stylesheet" href="css/styles.css">
   <link rel="shortcut icon" href="img/logo.ico" type="image/x-icon">
+  
+  
 </head>
 <body>
+  <div class="progress-bar" aria-hidden="true"></div>
   <a class="skip-link" href="#contenido">Saltar al contenido</a>
 
   <header class="cabecera">
     <nav aria-label="Navegación principal">
-      <a class="logo" href="#inicio" aria-label="Ir al inicio de Xuplly"><img src="img/logo.png" alt="">Xuplly</a>
+      <a class="logo" href="#inicio" aria-label="Ir al inicio de Xupply"><img src="img/logo.png" alt="">Xupply</a>
       <ul>
         <li><a href="#solucion">Solución</a></li>
         <li><a href="#funcionalidades">Funcionalidades</a></li>
@@ -31,7 +34,7 @@
     <section id="inicio" class="hero">
       <header class="hero-texto">
         <p class="etiqueta">Plataforma B2B para la industria de alimentos</p>
-        <h1>Xuplly conecta restaurantes y proveedores <span class="resaltar">en una sola plataforma</span></h1>
+        <h1>Xupply conecta restaurantes y proveedores <span class="resaltar texto-tipo">en una sola plataforma</span></h1>
         <p>Centraliza y automatiza pedidos, inventario, facturación y logística, reemplazando los procesos manuales por <strong>un flujo digital, trazable y en tiempo real</strong>.</p>
         <p class="cta">
           <a class="boton" href="#planes">Ver planes</a>
@@ -44,32 +47,26 @@
     </section>
 
     <section id="solucion" class="seccion">
-      <h2>¿Para quién es Xuplly?</h2>
+      <h2>¿Para quién es Xupply?</h2>
       <p class="lead">Una plataforma que <span class="resaltar">conecta digitalmente</span> a los actores de la cadena de suministro de alimentos.</p>
       <ul class="tarjetas">
         <li>
           <article>
-            <span class="icono" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>
-            </span>
+            <img class="imagen-tarjeta" src="img/restaurante.jpg" alt="Ilustración de un restaurante" loading="lazy">
             <h3>Restaurantes</h3>
             <p>Consultas productos, precios y disponibilidad, genera pedidos, hace seguimiento en tiempo real y centraliza el inventario.</p>
           </article>
         </li>
         <li>
           <article>
-            <span class="icono" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>
-            </span>
+            <img class="imagen-tarjeta" src="img/proveedores.jpg" alt="Ilustración de un proveedor de alimentos" loading="lazy">
             <h3>Proveedores</h3>
             <p>Publican su catálogo, reciben pedidos, los confirman y despachan con un flujo trazable de principio a fin.</p>
           </article>
         </li>
         <li>
           <article>
-            <span class="icono" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8Z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-            </span>
+            <img class="imagen-tarjeta" src="img/transportadores.jpg" alt="Ilustración de un transportador de alimentos" loading="lazy">
             <h3>Transportadores de alimentos</h3>
             <p>Se integran a la logística y las rutas de entrega para coordinar el despacho y la llegada de los pedidos.</p>
           </article>
@@ -83,11 +80,9 @@
       <ol class="flujo">
         <li>
           <article>
+            <img class="flujo-imagen" src="img/pedidos.jpg" alt="Ilustración de un pedido nuevo" loading="lazy">
             <span class="flujo-cabecera">
               <span class="paso">1</span>
-              <span class="flujo-icono" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6v4H9z"/><rect x="4" y="4" width="16" height="17" rx="2"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></svg>
-              </span>
             </span>
             <h3>Nuevo</h3>
             <p>El restaurante arma su pedido y lo envía al proveedor en segundos.</p>
@@ -95,11 +90,9 @@
         </li>
         <li>
           <article>
+            <img class="flujo-imagen" src="img/confirmacion.jpg" alt="Ilustración de un pedido confirmado" loading="lazy">
             <span class="flujo-cabecera">
               <span class="paso">2</span>
-              <span class="flujo-icono" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>
-              </span>
             </span>
             <h3>Confirmado</h3>
             <p>El proveedor revisa y confirma la disponibilidad del pedido.</p>
@@ -107,11 +100,9 @@
         </li>
         <li>
           <article>
+            <img class="flujo-imagen" src="img/preparacion.jpg" alt="Ilustración de un pedido preparándose" loading="lazy">
             <span class="flujo-cabecera">
               <span class="paso">3</span>
-              <span class="flujo-icono" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 11a4 4 0 0 0 0-8 6 6 0 0 0-11 0 4 4 0 0 0 0 8Z"/><path d="M17 11v8a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-8"/></svg>
-              </span>
             </span>
             <h3>Preparando</h3>
             <p>Los productos se alistan y empacan según el pedido confirmado.</p>
@@ -119,11 +110,9 @@
         </li>
         <li>
           <article>
+            <img class="flujo-imagen" src="img/despacho.jpg" alt="Ilustración de un pedido despachado" loading="lazy">
             <span class="flujo-cabecera">
               <span class="paso">4</span>
-              <span class="flujo-icono" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg>
-              </span>
             </span>
             <h3>Despachado</h3>
             <p>El proveedor entrega el pedido al transportador asignado.</p>
@@ -131,11 +120,9 @@
         </li>
         <li>
           <article>
+            <img class="flujo-imagen" src="img/en camino.webp" alt="Ilustración de un pedido en camino" loading="lazy">
             <span class="flujo-cabecera">
               <span class="paso">5</span>
-              <span class="flujo-icono" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8Z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-              </span>
             </span>
             <h3>En camino</h3>
             <p>Rastreas la entrega en tiempo real hasta la cocina.</p>
@@ -143,11 +130,9 @@
         </li>
         <li>
           <article>
+            <img class="flujo-imagen" src="img/entregado.avif" alt="Ilustración de un pedido entregado" loading="lazy">
             <span class="flujo-cabecera">
               <span class="paso">6</span>
-              <span class="flujo-icono" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 4l9 6.5"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/><path d="m9 16 2 2 4-4"/></svg>
-              </span>
             </span>
             <h3>Entregado</h3>
             <p>El restaurante recibe y cierra el ciclo del pedido.</p>
@@ -179,13 +164,13 @@
         <li>Facturación electrónica y envío automático de facturas por correo</li>
         <li>Gestión avanzada de inventario y alertas de stock</li>
         <li>Visualización y optimización de rutas de entrega</li>
-        <li><strong>Xuplly IA:</strong> asistente, predicción de inventario y reportes generados con IA</li>
+        <li><strong>Xupply IA:</strong> asistente, predicción de inventario y reportes generados con IA</li>
       </ul>
 
       <aside class="aviso">
-        <p><strong>Visión:</strong> convertir a Xuplly en una plataforma escalable para la gestión integral de restaurantes y comercios de alimentos, con múltiples sucursales, expansión a mercados regionales e inteligencia artificial cada vez más integrada.</p>
+        <p><strong>Visión:</strong> convertir a Xupply en una plataforma escalable para la gestión integral de restaurantes y comercios de alimentos, con múltiples sucursales, expansión a mercados regionales e inteligencia artificial cada vez más integrada.</p>
         <p><strong>Modelo de ingresos:</strong> tarifa periódica por mantenimiento y soporte, con los planes Básico, Medio y Premium.</p>
-        <p class="placeholder">[COMPLETAR: "Lo que más nos preocupa" del plan de riesgos si deseas publicarlo]</p>
+
       </aside>
     </section>
 
@@ -195,33 +180,44 @@
       <ul class="tarjetas">
         <li>
           <article class="plan">
-            <span class="icono" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M12 8a6 6 0 1 0 0 12 6 6 0 0 0 0-12Z"/><path d="M8 14h8"/></svg>
-            </span>
+            <img class="imagen-tarjeta" src="img/basico.png" alt="Ilustración del Plan Básico" loading="lazy">
             <h3>Plan Básico</h3>
-            <p class="precio">[COMPLETAR: precio del plan básico]</p>
-            <p>Funcionalidades esenciales de la plataforma y una versión básica de Xuplly IA.</p>
+            <p>Pensado para negocios que se inician en la digitalización: funcionalidades esenciales de la plataforma y una versión básica de Xupply IA.</p>
+            <ul class="plan-lista">
+              <li>Catálogo digital con productos, precios y disponibilidad</li>
+              <li>Creación y seguimiento de pedidos</li>
+              <li>Gestión básica de inventario</li>
+              <li>Mantenimiento y soporte periódico</li>
+            </ul>
           </article>
         </li>
         <li>
           <article class="plan destacado">
-            <span class="icono" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 11-13h-7l1-7Z"/></svg>
-            </span>
+            <img class="imagen-tarjeta" src="img/medio.png" alt="Ilustración del Plan Medio" loading="lazy">
+            <span class="etiqueta-plan">Más popular</span>
             <h3>Plan Medio</h3>
-            <p class="etiqueta-plan">Más popular</p>
-            <p class="precio">[COMPLETAR: precio del plan medio]</p>
-            <p>Mayores capacidades de gestión, análisis y uso de la inteligencia artificial.</p>
+            <p>Para operaciones en crecimiento que necesitan mayor control y análisis de su negocio, con la inteligencia artificial más integrada al flujo.</p>
+            <ul class="plan-lista">
+              <li>Todo lo incluido en el Plan Básico</li>
+              <li>Análisis de compras y consumo</li>
+              <li>Reportes y estadísticas del negocio</li>
+              <li>Xupply IA avanzada</li>
+              <li>Soporte prioritario</li>
+            </ul>
           </article>
         </li>
         <li>
           <article class="plan">
-            <span class="icono" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4-3.9-3.8 5.4-.8L12 3Z"/></svg>
-            </span>
+            <img class="imagen-tarjeta" src="img/premium.png" alt="Ilustración del Plan Premium" loading="lazy">
             <h3>Plan Premium</h3>
-            <p class="precio">[COMPLETAR: precio del plan premium]</p>
-            <p>Funcionalidades avanzadas de Xuplly IA: predicción de inventario, análisis avanzado, reportes automatizados y asistencia inteligente.</p>
+            <p>La solución completa para cadenas y operaciones grandes que aprovechan toda la potencia de Xupply IA en su gestión diaria.</p>
+            <ul class="plan-lista">
+              <li>Todo lo incluido en el Plan Medio</li>
+              <li>Predicción de inventario con IA</li>
+              <li>Análisis avanzado y reportes automatizados</li>
+              <li>Asistencia inteligente 24/7</li>
+              <li>Soporte dedicado y personalizado</li>
+            </ul>
           </article>
         </li>
       </ul>
@@ -229,27 +225,20 @@
 
     <section id="stack" class="seccion">
       <h2>Stack tecnológico</h2>
-      <dl class="stack">
-        <dt>Frontend</dt>
-        <dd>HTML5, TypeScript, React 19 con Vite y Tailwind</dd>
-        <dt>Backend</dt>
-        <dd>Node.js + Express + TypeScript</dd>
-        <dt>Base de datos</dt>
-        <dd>PostgreSQL</dd>
-        <dt>Tiempo real</dt>
-        <dd>WebSockets (Socket.IO) para actualizar los estados de pedidos al instante</dd>
-        <dt>Autenticación</dt>
-        <dd>AWS</dd>
-        <dt>Integraciones</dt>
-        <dd>EmailJS para notificaciones y envío de facturas por correo</dd>
-        <dt>Despliegue</dt>
-        <dd>Frontend en Vercel · Backend y base de datos en Supabase · CI/CD automático</dd>
-      </dl>
+      <ul class="stack">
+        <li><strong>Frontend:</strong> HTML5, TypeScript, React 19 con Vite y Tailwind</li>
+        <li><strong>Backend:</strong> Node.js + Express + TypeScript</li>
+        <li><strong>Base de datos:</strong> PostgreSQL</li>
+        <li><strong>Tiempo real:</strong> WebSockets (Socket.IO) para actualizar los estados de pedidos al instante</li>
+        <li><strong>Autenticación:</strong> AWS</li>
+        <li><strong>Integraciones:</strong> EmailJS para notificaciones y envío de facturas por correo</li>
+        <li><strong>Despliegue:</strong> Frontend en Vercel · Backend y base de datos en Supabase · CI/CD automático</li>
+      </ul>
     </section>
 
     <section id="equipo" class="seccion">
-      <h2>XupllySquad</h2>
-      <p class="lead">El equipo detrás de Xuplly.</p>
+      <h2>XupplySquad</h2>
+      <p class="lead">El equipo detrás de Xupply.</p>
       <ul class="tarjetas equipo">
         <li>
           <article>
@@ -308,32 +297,49 @@
         <button class="boton" type="submit">Enviar solicitud</button>
         <output id="estado-envio" class="mensaje" hidden aria-live="polite"></output>
       </form>
-      <p class="contacto-datos">
-        <a class="red-whatsapp" href="https://wa.me/573168603485" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-          +57 316 860 3485
-        </a>
-        <a class="red-gmail" href="mailto:jdbpberroteran@gmail.com">
-          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457Z"/></svg>
-          jdbpberroteran@gmail.com
-        </a>
-      </p>
     </section>
 
   </main>
 
   <footer>
-    <p>&copy; 2026 Xuplly — <strong>XupllySquad</strong>. Todos los derechos reservados.</p>
+    <p>&copy; 2026 Xupply — <strong>XupplySquad</strong>. Todos los derechos reservados.</p>
     <ul>
       <li><a href="#inicio">Inicio</a></li>
       <li><a href="#planes">Planes</a></li>
       <li><a href="#contacto">Contacto</a></li>
     </ul>
-    <!-- COMPLETAR: pega aquí la URL en cada # (GitHub, Twitter, Facebook) -->
+    <!-- COMPLETAR: pega aquí la URL real de cada red social del proyecto -->
     <ul class="redes">
-      <li><a href="#" target="_blank" rel="noopener">GitHub</a></li>
-      <li><a href="#" target="_blank" rel="noopener">Twitter</a></li>
-      <li><a href="#" target="_blank" rel="noopener">Facebook</a></li>
+      <li>
+        <a href="https://github.com/cheche2813/Hackathon-Xupply.git" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+          GitHub
+        </a>
+      </li>
+      <li>
+        <a href="https://x.com/" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg>
+          Twitter
+        </a>
+      </li>
+      <li>
+        <a href="https://facebook.com/" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          Facebook
+        </a>
+      </li>
+      <li>
+        <a href="https://wa.me/573168603485" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+          WhatsApp
+        </a>
+      </li>
+      <li>
+        <a href="mailto:jdbpberroteran@gmail.com">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457Z"/></svg>
+          Correo
+        </a>
+      </li>
     </ul>
   </footer>
 
@@ -357,11 +363,50 @@
         });
       }, { threshold: 0.15 });
 
-      document.querySelectorAll(".seccion > h2, .seccion > h3, .seccion .lead, .hero-texto, .captura, .tarjetas, .flujo > li, .aviso, .stack, form, .contacto-datos").forEach(function (el) {
+      document.querySelectorAll(".seccion > h2, .seccion > h3, .seccion .lead, .hero-texto, .captura, .tarjetas, .flujo > li, .aviso, .stack, form").forEach(function (el) {
         el.classList.add("reveal");
         observador.observe(el);
       });
     }
+
+    (function () {
+      var objetivo = document.querySelector(".texto-tipo");
+      if (objetivo && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        var frases = ["en una sola plataforma", "de punta a punta", "con trazabilidad en tiempo real"];
+        var i = 0;
+        var j = 0;
+        var borrando = false;
+        function paso() {
+          var frase = frases[i];
+          objetivo.textContent = frase.slice(0, j);
+          if (!borrando) {
+            if (j < frase.length) { j += 1; setTimeout(paso, 70); }
+            else { borrando = true; setTimeout(paso, 1900); }
+          } else {
+            if (j > 0) { j -= 1; setTimeout(paso, 32); }
+            else { borrando = false; i = (i + 1) % frases.length; setTimeout(paso, 400); }
+          }
+        }
+        paso();
+      }
+
+      var plantillaTiles = "";
+      for (var t = 1; t <= 10; t += 1) {
+        plantillaTiles += '<span class="tile tile-' + t + '"></span>';
+      }
+      document.querySelectorAll(".tarjetas:not(.equipo) > li > article, .flujo > li > article").forEach(function (tarjeta) {
+        if (tarjeta.classList.contains("efecto-tarjeta")) { return; }
+        tarjeta.classList.add("efecto-tarjeta");
+        tarjeta.insertAdjacentHTML("beforeend",
+          '<span class="shine" aria-hidden="true"></span>' +
+          '<span class="fondo-tiles" aria-hidden="true">' + plantillaTiles + '</span>' +
+          '<span class="linea linea-1" aria-hidden="true"></span>' +
+          '<span class="linea linea-2" aria-hidden="true"></span>' +
+          '<span class="linea linea-3" aria-hidden="true"></span>' +
+          '<span class="linea linea-4" aria-hidden="true"></span>'
+        );
+      });
+    })();
   </script>
 </body>
 </html>
