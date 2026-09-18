@@ -1,4 +1,4 @@
-# 🚀 Zupply IA - Plataforma B2B ERP & Ecosistema Logístico
+# 🚀 Xupply IA - Plataforma B2B ERP & Ecosistema Logístico
 
 > Plataforma B2B inteligente para restaurantes y proveedores de alimentos en **Bucaramanga, Santander, Colombia**.
 
