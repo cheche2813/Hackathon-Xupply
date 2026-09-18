@@ -10,8 +10,8 @@ El **PM lidera** esta reunión y es el canal con el instructor (que hace de clie
 
 ## 1. Identidad del equipo
 
-- **Nombre del equipo:*ZupplySquad*
-- **Nombre del proyecto:*Zupply*
+- **Nombre del equipo:*XupplySquad*
+- **Nombre del proyecto:*Xupply*
 - **Integrantes y roles:**
   | Integrante | Rol | Responsable de |
   |-----------|-----|----------------|
@@ -28,17 +28,17 @@ El **PM lidera** esta reunión y es el canal con el instructor (que hace de clie
 
 ## 2. Visión del proyecto
 
-**La idea en una frase:*Zupply es una plataforma B2B que conecta restaurantes y proveedores para centralizar y automatizar pedidos, inventario, facturación y logística en una sola plataforma.* _..._
+**La idea en una frase:*Xupply es una plataforma B2B que conecta restaurantes y proveedores para centralizar y automatizar pedidos, inventario, facturación y logística en una sola plataforma.* _..._
 
 - **¿Para quién es? (usuarios):*Restaurantes - Provedores - transportadores de alimentos*
 
 - **¿Qué problema resuelve o qué permite hacer?:*Permite conectar digitalmente a los restaurantes con sus proveedores, facilitando la consulta de productos, generación de pedidos, confirmación, despacho, entrega y seguimiento. Además, centraliza inventario, facturación y logística, reemplazando procesos manuales por un flujo automatizado y trazable.*
 
-- **Visión (a dónde quieren llevarlo):*Convertir Zupply en una plataforma escalable para la gestión integral de restaurantes y comercios de alimentos, permitiendo manejar múltiples sucursales y expandirse posteriormente a mercados regionales, incorporando cada vez más herramientas de inteligencia artificial.*
+- **Visión (a dónde quieren llevarlo):*Convertir Xupply en una plataforma escalable para la gestión integral de restaurantes y comercios de alimentos, permitiendo manejar múltiples sucursales y expandirse posteriormente a mercados regionales, incorporando cada vez más herramientas de inteligencia artificial.*
 
-- **Modelo:*B2B (Business to Business), porque conecta empresas: principalmente restaurantes/comercios de alimentos con sus proveedores. El documento define explícitamente a Zupply como una plataforma B2B tipo ERP.* 
+- **Modelo:*B2B (Business to Business), porque conecta empresas: principalmente restaurantes/comercios de alimentos con sus proveedores. El documento define explícitamente a Xupply como una plataforma B2B tipo ERP.* 
 
-- **¿Cómo generaría valor o dinero?*Zupply manejará un modelo de ingresos híbrido. Inicialmente, se cobrará una tarifa por periódica por mantenimiento y soporte. La plataforma contará con tres planes de servicio: un Plan Básico, que incluirá las funcionalidades esenciales y una versión básica de Zupply IA; un Plan Medio, que ofrecerá mayores capacidades de gestión, análisis y uso de la inteligencia artificial; y un Plan Premium, que incluirá las funcionalidades más avanzadas de Zupply IA, como predicción de inventario, análisis avanzado, generación automatizada de reportes y asistencia inteligente. De esta manera, los clientes podrán elegir el plan que mejor se adapte a sus necesidades y aumentar su nivel de servicio a medida que crezca su operación.*
+- **¿Cómo generaría valor o dinero?*Xupply manejará un modelo de ingresos híbrido. Inicialmente, se cobrará una tarifa por periódica por mantenimiento y soporte. La plataforma contará con tres planes de servicio: un Plan Básico, que incluirá las funcionalidades esenciales y una versión básica de Xupply IA; un Plan Medio, que ofrecerá mayores capacidades de gestión, análisis y uso de la inteligencia artificial; y un Plan Premium, que incluirá las funcionalidades más avanzadas de Xupply IA, como predicción de inventario, análisis avanzado, generación automatizada de reportes y asistencia inteligente. De esta manera, los clientes podrán elegir el plan que mejor se adapte a sus necesidades y aumentar su nivel de servicio a medida que crezca su operación.*
 
 ---
 
@@ -86,11 +86,11 @@ Deben cubrir **los mínimos del curso**. Marquen qué usarán:
 
 - [X] **Frontend:** HTML5/TS, React 19 (Vite + Tailwind), Node.js + Express..
 - [X] **Backend:** Node.js + Express + TypeScript: 13 routers, ~37 endpoints REST (server/src/routes/).
-- [X] **Base de datos:** PostgreSQL (database/zupply_schema_postgresql.sql)
+- [X] **Base de datos:** PostgreSQL (database/Xupply_schema_postgresql.sql)
 - [X] **Feature clave:** Websocket 
 - [X] **Tiempo real (Socket.IO):** Sí. Se utilizará para actualizar en tiempo real los estados de los pedidos entre restaurante y proveedor.
 - [X] **Autenticación:** AWS
-- [X] **Otra técnica / API externa:** Se contempla EmailJS para envío de notificaciones y facturas por correo. Esto coincide con las integraciones previstas en el documento de Zupply.
+- [X] **Otra técnica / API externa:** Se contempla EmailJS para envío de notificaciones y facturas por correo. Esto coincide con las integraciones previstas en el documento de Xupply.
 
 
 ---
