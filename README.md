@@ -60,8 +60,8 @@ zupply/
 
 ### 1. Clonar el repositorio e instalar dependencias
 ```bash
-git clone https://github.com/tu-usuario/zupply.git
-cd zupply
+git clone https://github.com/tu-usuario/xupply.git
+cd xupply
 npm run install:all
 ```
 
