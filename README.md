@@ -1,84 +1,75 @@
-# Xupply
+# 🚀 Plan de Trabajo DevOps — Zupply (Hackathon-Xupply)
 
-Plataforma B2B para la digitalizacion de restaurantes y empresas distribuidoras de la region metropolitana de Bucaramanga: catalogo mayorista, pedidos con seguimiento GPS en tiempo real, facturacion electronica, inventario, contabilidad e inteligencia artificial.
-
-## Modulos
-
-- **Catálogo mayorista**: categorias, productos y proveedores recomendados segun tu cocina.
-- **Pedidos B2B**: carrito, ordenes, facturas y seguimiento en vivo de entregas (GPS satelital y asignacion vehicular).
-- **Inventario y contabilidad**: control de stock, reportes de flujo de caja y facturacion electronica.
-- **Asistente Xupply IA**: copiloto sobre food cost, compras mayoristas y logistica de entrega (disponible segun el plan).
-- **Planes de suscripción**: basico, medio y premium (Xupply Lite, Pro y Max).
-- **Roles**: admin, gerente, empleado, proveedor y domiciliario.
-- **Multiplataforma**: PWA instalable, app Android (Capacitor) y aplicacion de escritorio (Electron).
-
-## Estructura
-
-```
-app/
-  server/   Backend Express + PostgreSQL + Socket.IO (TypeScript)
-  web/      Frontend React + Vite + Tailwind (TypeScript, PWA)
-  web/android/  Proyecto Android Capacitor (com.xupply.app)
-  main.js   Proceso principal Electron (app de escritorio)
-  scripts/  Instalacion y provision local (PostgreSQL)
-xupply_schema_postgresql.sql  Esquema de base de datos
-```
-
-## Requisitos
-
-- Node.js 20+ (desarrollo)
-- PostgreSQL 16 o 18 (desarrollo)
-- Docker + Docker Compose (produccion opcional)
-
-## Puesta en marcha (desarrollo)
-
-```bash
-# Backend
-cd app/server
-npm install
-cp .env.example .env
-npm run dev          # http://localhost:4000
-
-# Frontend
-cd app/web
-npm install
-npm run dev          # http://localhost:5173
-```
-
-Crea la base `xupply` y aplica el esquema `app/server/DB/xupply_schema_postgresql.sql`.
-
-### Usuarios de prueba
-
-Usuarios demo (contrasena: `demo1234`): `admin`, `gerente`, `empleado`, `proveedor`, `domiciliario`.
-
-## Modo portatil (Windows, sin instalar nada)
-
-Copia la carpeta `XupplyPortable` a una unidad local y ejecuta `Iniciar-Xupply.cmd`. Levanta PostgreSQL, carga el esquema y abre la ventana de Electron. Ve `LEER-YA.txt` para detalles.
-
-## Despliegue
-
-- **Render**: sigue `RENDER.md` (`render.yaml` crea el servicio web `xupply` y la base `xupply-db`).
-- **DigitalOcean**: sigue `DIGITALOCEAN.md` (Docker Compose + Caddy con HTTPS automatico).
-- **APK**: usa `build-apk.ps1` (compila con Capacitor y deja `Xupply.apk` en `app/web/public`).
-
-## Variables de entorno
-
-Espejo en `.env.production.example` y `app/server/.env.example`:
-
-| Variable        | Descripcion                                   |
-| --------------- | --------------------------------------------- |
-| `DOMAIN`        | Dominio de produccion (Caddy).                |
-| `POSTGRES_DB`   | Nombre de la base de datos (`xupply`).        |
-| `POSTGRES_USER` | Usuario de base de datos.                     |
-| `POSTGRES_PASSWORD` | Contrasena de base de datos.              |
-| `DATABASE_URL`  | Cadena de conexion PostgreSQL.                |
-| `JWT_SECRET`    | Secreto para tokens.                          |
-| `CLIENT_ORIGIN` | Origen permitido (CORS) para la PWA/Socket.IO.|
-
-## Verificacion de salud
-
-El endpoint `/health` responde `{"status":"ok","service":"xupply-api"}`.
+Este documento explica en detalle **qué vamos a hacer en la rama de DevOps**, por qué lo vamos a hacer y cómo esta infraestructura asegurará que el proyecto **Zupply** esté 100% operativo, estable y desplegado para la presentación de la Hackathon
 
 ---
 
-Documentacion adicional: `RENDER.md`, `DIGITALOCEAN.md`, `app/LEER-ESCRITORIO.md` y `LEER-YA.txt`.
+## 🎯 ¿Cuál es el objetivo de esta rama?
+
+El objetivo principal de esta rama es **liberar al equipo de desarrollo de los problemas de configuración, entorno y despliegue**. Nos encargaremos de que el código que cada compañero escriba en su máquina funcione exactamente igual en internet y esté disponible en un enlace público para mostrar al jurado.
+
+---
+
+## 📋 ¿Qué vamos a hacer exactamente? (Paso a Paso)
+
+### 1. Estandarizar el Entorno de Desarrollo (Dockerización)
+* **¿Qué vamos a hacer?** Crearemos archivos de configuración (`Dockerfile` y `docker-compose.yml`) para empaquetar el Frontend, el Backend y la Base de Datos.
+* **¿Por qué?** Para evitar el típico problema de *"en mi computador sí funciona, pero en el tuyo no"*. Cualquier integrante del equipo podrá levantar todo el proyecto localmente ejecutando un solo comando (`docker-compose up`).
+
+---
+
+### 2. Automatizar Pruebas y Validación de Código (Integración Continua - CI)
+* **¿Qué vamos a hacer?** Configuraremos **GitHub Actions** para que, cada vez que alguien envíe un Pull Request o suba cambios a la rama de desarrollo/principal, el sistema automáticamente:
+  1. Compruebe que no haya errores de sintaxis o compilación.
+  2. Ejecute las pruebas del sistema.
+  3. Verifique que la aplicación construya (*build*) sin fallos.
+* **¿Por qué?** Evita que subamos código roto a la rama principal que pueda dañar la demo antes de la presentación.
+
+---
+
+### 3. Configurar el Despliegue Automático en la Nube (Despliegue Continuo - CD)
+* **¿Qué vamos a hacer?** Conectaremos el repositorio con plataformas cloud gratuitas/rápidas para tener URLs públicas en vivo:
+  * **Frontend:** Despliegue automático en Vercel.
+  * **Backend:** Despliegue automático de APIs en Render o Railway.
+  * **Base de Datos:** Aprovisionamiento y migración de esquemas en Supabase / PostgreSQL en la nube.
+* **¿Por qué?** Necesitamos que el proyecto esté accesible en la web a través de un enlace real para la demo y evaluación del jurado.
+
+---
+
+### 4. Gestión de Seguridad y Variables de Entorno
+* **¿Qué vamos a hacer?** 
+  * Crear un archivo `.env.example` con la estructura de credenciales necesarias.
+  * Configurar los **GitHub Secrets** y las variables de entorno en los paneles de Vercel/Render para resguardar las API Keys, credenciales de base de datos y tokens de autenticación.
+  * Ajustar las políticas de **CORS** para que el Frontend pueda comunicarse sin bloqueos de seguridad con el Backend.
+* **¿Por qué?** No debemos exponer credenciales privadas ni claves secretas en el código público de GitHub.
+
+---
+
+### 5. Preparación y Aseguramiento para el "Demo Day" (Presentación)
+* **¿Qué vamos a hacer?**
+  * **Poblar la Base de Datos (Seeding):** Preparar scripts de datos de prueba realistas para que durante la presentación de Zupply la interfaz no se vea vacía.
+  * **Monitoreo y Calentamiento de Servidores:** Configurar *healthchecks* para asegurar que los servidores en la nube no entren en suspensión justo antes de exponer el proyecto ante el jurado.
+  * **Plan de Contingencia:** Tener listo un plan de respaldo local o de entorno espejo por si falla la conexión a internet durante el evento.
+
+---
+
+## 🛠️ Flujo de Trabajo que Sopesará el Equipo
+
+1. **Desarrolladores:** Trabajan en sus funciones en ramas `feature/nombre-funcionalidad`.
+2. **Integración:** Crean Pull Request hacia la rama de integración.
+3. **DevOps (Esta rama):**
+   * El pipeline automático valida el código.
+   * Si todo está correcto, se fusiona a `main`.
+   * La infraestructura despliega los cambios en vivo en cuestión de minutos.
+
+---
+
+## 📌 Resumen de Entregables de DevOps
+
+| Entregable | Herramienta / Tecnología | Resultado Esperado |
+| :--- | :--- | :--- |
+| **Contenedores** | Docker & Docker Compose | Proyecto ejecutable en 1 comando local |
+| **Pipeline CI/CD** | GitHub Actions | Pruebas y compilación automatizadas |
+| **Hosting Frontend** | Vercel | URL pública para la interfaz de Zupply |
+| **Hosting Backend** | Render | API activa en la nube |
+| **Base de Datos** | Supabase (PostgreSQL) | BD remota configurada y con datos de prueba |
