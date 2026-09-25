@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Xupply: plataforma B2B para restaurantes y distribuidores de Bucaramanga. Catálogo mayorista, pedidos con GPS en vivo, inventario, facturación electrónica y Xupply IA." />
+  <meta name="theme-color" content="#0284c7" />
+  <meta name="author" content="Xupply" />
+  <meta property="og:title" content="Xupply — Plataforma gastronómica B2B" />
+  <meta property="og:description" content="Catálogo mayorista, pedidos, logística GPS, inventario, contabilidad y asistente IA." />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="es_CO" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/favicon.png" type="image/png" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <title>Xupply — Plataforma B2B para restaurantes y proveedores</title>
+  <!-- Fase 2: aquí se inyectarán Tailwind CSS y el bundle de React (/src/main.jsx). -->
+  <!-- Fase 2: aquí se registrará el Service Worker de la PWA. -->
+</head>
+
+<body>
+  <a href="#contenido">Saltar al contenido principal</a>
+
+  <!-- ============================================================
+       CABECERA GLOBAL
+       React futuro: <Navbar /> · Contextos: Auth, Cart, Theme, Lang
+       ============================================================ -->
+  <header id="cabecera">
+    <figure>
+      <a href="#panel" aria-label="Xupply, ir al panel principal">
+        <strong>Xupply</strong>
+      </a>
+      <figcaption>Plataforma gastronómica B2B — Bucaramanga</figcaption>
+    </figure>
+
+    <nav aria-label="Navegación principal">
+      <menu>
+        <li><a href="#panel">Panel</a></li>
+        <li><a href="#catalogo">Catálogo</a></li>
+        <li><a href="#pedidos">Pedidos</a></li>
+        <li><a href="#inventario">Inventario</a></li>
+        <li><a href="#facturacion">Facturación</a></li>
+        <li><a href="#contabilidad">Contabilidad</a></li>
+        <li><a href="#proveedores">Proveedores</a></li>
+        <li><a href="#logistica">Logística</a></li>
+        <li><a href="#xupply-ia">Xupply IA</a></li>
+        <li><a href="#equipo">Equipo</a></li>
+        <li><a href="#planes">Planes</a></li>
+      </menu>
+    </nav>
+
+    <form id="buscador-global" role="search" action="#catalogo" method="get">
+      <label for="q">Buscar en catálogo mayorista</label>
+      <input type="search" id="q" name="q" placeholder="Producto, SKU o proveedor…" autocomplete="off" />
+      <button type="submit">Buscar</button>
+    </form>
+
+    <menu aria-label="Sesión y preferencias">
+      <li><a href="#acceso">Iniciar sesión</a></li>
+      <li><a href="#registro">Crear cuenta</a></li>
+      <li>
+        <button type="button" id="accion-carrito" aria-controls="carrito" aria-haspopup="dialog">
+          Carrito <output id="contador-carrito" for="lista-carrito" aria-live="polite">0</output>
+        </button>
+      </li>
+    </menu>
+  </header>
+
+  <!-- ============================================================
+       CONTENIDO PRINCIPAL — futuro punto de montaje de React Router
+       Rutas actuales en xupply-D: /, /login, /register, /catalogo,
+       /carrito, /pedidos, /pedidos/:id, /inventario, /facturacion,
+       /contabilidad, /proveedores, /logistica, /planes, /xupply-ia, /equipo
+       ============================================================ -->
+  <main id="contenido">
+    <h1>Xupply: abastecimiento mayorista para restaurantes</h1>
+    <p>Catálogo, pedidos con seguimiento GPS, inventario, facturación electrónica y asistente IA.</p>
+
+    <!-- ACCESO / REGISTRO · POST /api/auth/login · POST /api/auth/register -->
+    <section id="acceso" aria-labelledby="titulo-acceso">
+      <h2 id="titulo-acceso">Acceso</h2>
+      <article aria-labelledby="titulo-login">
+        <h3 id="titulo-login">Iniciar sesión</h3>
+        <form id="formulario-login" data-endpoint="/api/auth/login" method="post">
+          <fieldset>
+            <legend>Credenciales de usuario</legend>
+            <p>
+              <label for="login-usuario">Usuario</label>
+              <input type="text" id="login-usuario" name="username" required autocomplete="username" />
+            </p>
+            <p>
+              <label for="login-clave">Contraseña</label>
+              <input type="password" id="login-clave" name="password" required autocomplete="current-password" />
+            </p>
+            <p><button type="submit">Entrar</button></p>
+          </fieldset>
+        </form>
+        <p>Usuarios demo: <samp>admin</samp>, <samp>gerente</samp>, <samp>empleado</samp>, <samp>proveedor</samp>, <samp>domiciliario</samp>.</p>
+      </article>
+
+      <article id="registro" aria-labelledby="titulo-registro">
+        <h3 id="titulo-registro">Crear cuenta</h3>
+        <form id="formulario-registro" data-endpoint="/api/auth/register" method="post">
+          <fieldset>
+            <legend>Datos del negocio</legend>
+            <p>
+              <label for="registro-nombre">Nombre</label>
+              <input type="text" id="registro-nombre" name="name" required autocomplete="name" />
+            </p>
+            <p>
+              <label for="registro-correo">Correo</label>
+              <input type="email" id="registro-correo" name="email" required autocomplete="email" />
+            </p>
+            <p>
+              <label for="registro-rol">Rol</label>
+              <select id="registro-rol" name="role" required>
+                <option value="restaurante">Restaurante</option>
+                <option value="proveedor">Proveedor</option>
+                <option value="domiciliario">Domiciliario</option>
+              </select>
+            </p>
+            <p><button type="submit">Registrarme</button></p>
+          </fieldset>
+        </form>
+      </article>
+    </section>
+
+    <!-- PANEL · GET /api/dashboard · GET /health -->
+    <section id="panel" data-endpoint="/api/dashboard" aria-labelledby="titulo-panel">
+      <h2 id="titulo-panel">Panel</h2>
+      <p>Resumen operativo del negocio: ventas, pedidos activos, stock crítico y flujo de caja.</p>
+      <ul id="indicadores-panel" aria-live="polite">
+        <li>
+          <article aria-labelledby="ind-ventas">
+            <h3 id="ind-ventas">Ventas del periodo</h3>
+            <p><data id="valor-ventas" value="">—</data></p>
+          </article>
+        </li>
+        <li>
+          <article aria-labelledby="ind-pedidos">
+            <h3 id="ind-pedidos">Pedidos activos</h3>
+            <p><data id="valor-pedidos" value="">—</data></p>
+          </article>
+        </li>
+        <li>
+          <article aria-labelledby="ind-stock">
+            <h3 id="ind-stock">Stock crítico</h3>
+            <p><data id="valor-stock" value="">—</data></p>
+          </article>
+        </li>
+        <li>
+          <article aria-labelledby="ind-caja">
+            <h3 id="ind-caja">Flujo de caja</h3>
+            <p><data id="valor-caja" value="">—</data></p>
+          </article>
+        </li>
+      </ul>
+      <p><small>Estado del servicio: <output id="estado-api" data-endpoint="/health">por verificar</output></small></p>
+    </section>
+
+    <!-- CATÁLOGO · GET /api/products · GET /api/categories · GET /api/suppliers -->
+    <section id="catalogo" data-endpoint="/api/products" aria-labelledby="titulo-catalogo">
+      <h2 id="titulo-catalogo">Catálogo mayorista</h2>
+      <p>Categorías, productos y proveedores recomendados según tu cocina.</p>
+
+      <form id="filtros-catalogo" method="get" action="#catalogo">
+        <fieldset>
+          <legend>Filtrar productos</legend>
+          <p>
+            <label for="filtro-categoria">Categoría</label>
+            <select id="filtro-categoria" name="category" data-endpoint="/api/categories"></select>
+          </p>
+          <p>
+            <label for="filtro-proveedor">Proveedor</label>
+            <select id="filtro-proveedor" name="supplier" data-endpoint="/api/suppliers"></select>
+          </p>
+          <p>
+            <label for="filtro-precio">Precio máximo</label>
+            <input type="number" id="filtro-precio" name="max_price" min="0" step="100" />
+          </p>
+          <p><button type="submit">Aplicar filtros</button></p>
+        </fieldset>
+      </form>
+
+      <menu id="menu-categorias" data-endpoint="/api/categories" aria-label="Categorías del catálogo"></menu>
+
+      <ul id="lista-productos" aria-live="polite" aria-label="Productos disponibles"></ul>
+
+      <template id="plantilla-producto">
+        <article>
+          <figure>
+            <img alt="" loading="lazy" />
+            <figcaption></figcaption>
+          </figure>
+          <h3></h3>
+          <p></p>
+          <p><data></data> <span></span></p>
+          <form method="post" data-endpoint="/api/orders">
+            <p>
+              <label>Cantidad <input type="number" name="quantity" min="1" value="1" /></label>
+              <button type="submit">Añadir al carrito</button>
+            </p>
+          </form>
+        </article>
+      </template>
+    </section>
+
+    <!-- PROVEEDORES · GET /api/suppliers · GET /api/reviews · GET /api/restaurants -->
+    <section id="proveedores" data-endpoint="/api/suppliers" aria-labelledby="titulo-proveedores">
+      <h2 id="titulo-proveedores">Proveedores</h2>
+      <p>Directorio mayorista verificado con calificaciones de restaurantes.</p>
+      <ul id="lista-proveedores" aria-live="polite"></ul>
+      <article aria-labelledby="titulo-resenas">
+        <h3 id="titulo-resenas">Reseñas recientes</h3>
+        <ol id="lista-resenas" data-endpoint="/api/reviews"></ol>
+      </article>
+    </section>
+
+    <!-- PEDIDOS · GET/POST /api/orders · GET /api/orders/:id -->
+    <section id="pedidos" data-endpoint="/api/orders" aria-labelledby="titulo-pedidos">
+      <h2 id="titulo-pedidos">Pedidos B2B</h2>
+      <p>Carrito, órdenes, facturas asociadas y seguimiento de entregas.</p>
+      <ol id="lista-pedidos" aria-live="polite"></ol>
+      <article id="detalle-pedido-contenedor" aria-labelledby="titulo-detalle-pedido" hidden>
+        <h3 id="titulo-detalle-pedido">Detalle del pedido</h3>
+        <dl id="datos-pedido">
+          <dt>Código</dt><dd id="pedido-codigo">—</dd>
+          <dt>Estado</dt><dd id="pedido-estado">—</dd>
+          <dt>Total</dt><dd><data id="pedido-total" value="">—</data></dd>
+        </dl>
+        <table>
+          <caption>Ítems del pedido</caption>
+          <thead>
+            <tr><th scope="col">Producto</th><th scope="col">Cantidad</th><th scope="col">Precio</th><th scope="col">Subtotal</th></tr>
+          </thead>
+          <tbody id="lineas-pedido"></tbody>
+        </table>
+      </article>
+      <template id="plantilla-pedido">
+        <article>
+          <h3></h3>
+          <p></p>
+          <p><data></data> · <time></time></p>
+          <p><a href="#detalle-pedido-contenedor">Ver detalle</a></p>
+        </article>
+      </template>
+    </section>
+
+    <!-- LOGÍSTICA · GET /api/deliveries · Socket.IO: ubicación GPS en vivo -->
+    <section id="logistica" data-endpoint="/api/deliveries" aria-labelledby="titulo-logistica">
+      <h2 id="titulo-logistica">Logística y entregas en vivo</h2>
+      <p>Asignación vehicular y seguimiento GPS satelital de cada despacho.</p>
+      <figure>
+        <figcaption>Mapa de entregas activas — Bucaramanga y área metropolitana</figcaption>
+        <output id="mapa-entregas" aria-label="Mapa de entregas">El mapa se cargará aquí.</output>
+      </figure>
+      <ol id="lista-entregas" aria-live="polite"></ol>
+    </section>
+
+    <!-- INVENTARIO · GET /api/inventory -->
+    <section id="inventario" data-endpoint="/api/inventory" aria-labelledby="titulo-inventario">
+      <h2 id="titulo-inventario">Inventario</h2>
+      <p>Control de existencias, mínimos, máximos y alertas de vencimiento.</p>
+      <table>
+        <caption>Existencias por insumo</caption>
+        <thead>
+          <tr>
+            <th scope="col">Insumo</th>
+            <th scope="col">Categoría</th>
+            <th scope="col">Stock actual</th>
+            <th scope="col">Stock mínimo</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Proveedor</th>
+          </tr>
+        </thead>
+        <tbody id="filas-inventario" aria-live="polite"></tbody>
+      </table>
+    </section>
+
+    <!-- FACTURACIÓN · GET /api/invoices -->
+    <section id="facturacion" data-endpoint="/api/invoices" aria-labelledby="titulo-facturacion">
+      <h2 id="titulo-facturacion">Facturación electrónica</h2>
+      <p>Facturas DIAN con IVA e impoconsumo, vinculadas a cada orden.</p>
+      <table>
+        <caption>Facturas emitidas</caption>
+        <thead>
+          <tr>
+            <th scope="col">Factura</th>
+            <th scope="col">Orden</th>
+            <th scope="col">Cliente</th>
+            <th scope="col">Total</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Fecha</th>
+          </tr>
+        </thead>
+        <tbody id="filas-facturas" aria-live="polite"></tbody>
+      </table>
+    </section>
+
+    <!-- CONTABILIDAD · GET /api/accounting -->
+    <section id="contabilidad" data-endpoint="/api/accounting" aria-labelledby="titulo-contabilidad">
+      <h2 id="titulo-contabilidad">Contabilidad</h2>
+      <p>Ingresos, egresos y reportes de flujo de caja del restaurante.</p>
+      <table>
+        <caption>Movimientos contables</caption>
+        <thead>
+          <tr>
+            <th scope="col">Fecha</th>
+            <th scope="col">Tipo</th>
+            <th scope="col">Concepto</th>
+            <th scope="col">Categoría</th>
+            <th scope="col">Monto</th>
+          </tr>
+        </thead>
+        <tbody id="filas-movimientos" aria-live="polite"></tbody>
+      </table>
+    </section>
+
+    <!-- XUPPLY IA · POST /api/ai -->
+    <section id="xupply-ia" data-endpoint="/api/ai" aria-labelledby="titulo-ia">
+      <h2 id="titulo-ia">Asistente Xupply IA</h2>
+      <p>Copiloto de food cost, compras mayoristas y logística. Disponible según tu plan.</p>
+      <ol id="conversacion-ia" aria-live="polite" aria-label="Conversación con Xupply IA"></ol>
+      <form id="formulario-ia" method="post" data-endpoint="/api/ai">
+        <p>
+          <label for="pregunta-ia">Pregunta al asistente</label>
+          <textarea id="pregunta-ia" name="prompt" rows="3" placeholder="Ej.: ¿Cuál es mi food cost ideal este mes?" required></textarea>
+        </p>
+        <p><button type="submit">Enviar</button></p>
+      </form>
+    </section>
+
+    <!-- EQUIPO · GET /api/users -->
+    <section id="equipo" data-endpoint="/api/users" aria-labelledby="titulo-equipo">
+      <h2 id="titulo-equipo">Equipo y roles</h2>
+      <p>Gestión de usuarios: <samp>admin</samp>, <samp>gerente</samp>, <samp>empleado</samp>, <samp>proveedor</samp> y <samp>domiciliario</samp>.</p>
+      <ul id="lista-equipo" aria-live="polite"></ul>
+    </section>
+
+    <!-- PLANES · Lite / Pro / Max -->
+    <section id="planes" aria-labelledby="titulo-planes">
+      <h2 id="titulo-planes">Planes de suscripción</h2>
+      <ul>
+        <li>
+          <article aria-labelledby="plan-lite">
+            <h3 id="plan-lite">Xupply Lite</h3>
+            <p><data value="lite">Básico</data> — catálogo y pedidos esenciales.</p>
+            <ul>
+              <li>Catálogo mayorista</li>
+              <li>Pedidos y facturas base</li>
+            </ul>
+            <p><a href="#registro">Elegir Lite</a></p>
+          </article>
+        </li>
+        <li>
+          <article aria-labelledby="plan-pro">
+            <h3 id="plan-pro">Xupply Pro</h3>
+            <p><data value="pro">Medio</data> — inventario, contabilidad y logística GPS.</p>
+            <ul>
+              <li>Todo lo de Lite</li>
+              <li>Inventario y contabilidad</li>
+              <li>Seguimiento GPS en vivo</li>
+            </ul>
+            <p><a href="#registro">Elegir Pro</a></p>
+          </article>
+        </li>
+        <li>
+          <article aria-labelledby="plan-max">
+            <h3 id="plan-max">Xupply Max</h3>
+            <p><data value="max">Premium</data> — IA avanzada y soporte prioritario.</p>
+            <ul>
+              <li>Todo lo de Pro</li>
+              <li>Xupply IA sin límites</li>
+              <li>Reportes inteligentes</li>
+            </ul>
+            <p><a href="#registro">Elegir Max</a></p>
+          </article>
+        </li>
+      </ul>
+    </section>
+  </main>
+
+  <!-- CARRITO LATERAL · refleja POST /api/orders -->
+  <aside id="carrito" data-endpoint="/api/orders" aria-labelledby="titulo-carrito">
+    <h2 id="titulo-carrito">Carrito mayorista</h2>
+    <ol id="lista-carrito" aria-live="polite"></ol>
+    <p>Total estimado: <output id="total-carrito" for="lista-carrito">—</output></p>
+    <form id="formulario-pedido" method="post" data-endpoint="/api/orders">
+      <fieldset>
+        <legend>Confirmar pedido</legend>
+        <p>
+          <label for="direccion-entrega">Dirección de entrega</label>
+          <input type="text" id="direccion-entrega" name="delivery_address" required autocomplete="street-address" />
+        </p>
+        <p>
+          <label for="notas-pedido">Notas</label>
+          <textarea id="notas-pedido" name="notes" rows="2"></textarea>
+        </p>
+        <p><button type="submit">Confirmar pedido</button></p>
+      </fieldset>
+    </form>
+  </aside>
+
+  <!-- NOTIFICACIONES EN VIVO · Socket.IO -->
+  <aside id="notificaciones" aria-labelledby="titulo-notificaciones">
+    <h2 id="titulo-notificaciones">Notificaciones</h2>
+    <ul id="lista-notificaciones" aria-live="polite"></ul>
+  </aside>
+
+  <!-- PIE GLOBAL -->
+  <footer id="pie">
+    <nav aria-label="Navegación secundaria">
+      <menu>
+        <li><a href="#catalogo">Catálogo</a></li>
+        <li><a href="#planes">Planes</a></li>
+        <li><a href="#proveedores">Proveedores</a></li>
+        <li><a href="#xupply-ia">Xupply IA</a></li>
+      </menu>
+    </nav>
+    <address>
+      Xupply · Bucaramanga, Santander, Colombia<br />
+      <a href="mailto:contacto@xupply.co">contacto@xupply.co</a>
+    </address>
+    <p><small>© <time datetime="2026">2026</time> Xupply. Plataforma B2B para restaurantes y distribuidores.</small></p>
+  </footer>
+
+  <!-- DIÁLOGOS NATIVOS -->
+  <dialog id="dialogo-terminos" aria-labelledby="titulo-terminos">
+    <article>
+      <h2 id="titulo-terminos">Términos y condiciones</h2>
+      <p>El contenido legal se cargará aquí antes del registro.</p>
+      <form method="dialog">
+        <p><button type="submit">Cerrar</button></p>
+      </form>
+    </article>
+  </dialog>
+
+  <dialog id="dialogo-sesion" aria-labelledby="titulo-sesion">
+    <article>
+      <h2 id="titulo-sesion">Sesión requerida</h2>
+      <p>Inicia sesión para ver pedidos, inventario y facturación.</p>
+      <p><a href="#acceso">Ir al acceso</a></p>
+      <form method="dialog">
+        <p><button type="submit">Cerrar</button></p>
+      </form>
+    </article>
+  </dialog>
+
+  <noscript>
+    <p>Xupply necesita JavaScript para el catálogo, el carrito y el seguimiento GPS. Actívalo para continuar.</p>
+  </noscript>
+</body>
+</html>
