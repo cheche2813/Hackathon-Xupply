@@ -1,0 +1,19 @@
+{
+  "name": "Xupply — Plataforma B2B de restaurantes y proveedores",
+  "short_name": "Xupply",
+  "description": "Xupply conecta restaurantes y proveedores de alimentos en Bucaramanga: catálogo mayorista, pedidos con seguimiento GPS, inventario, facturación electrónica y Xupply IA.",
+  "lang": "es-CO",
+  "start_url": "/#inicio",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0284c7",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
