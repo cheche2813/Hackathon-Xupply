@@ -1,0 +1,302 @@
+import { query } from '../config/db';
+
+/**
+ * Hash bcrypt real para la contraseña demo `demo1234`.
+ * Reemplaza el placeholder inválido `$2b$10$DefaulthashForDemo...` que
+ * permitía entrar sin validar el hash (backdoor) en bases de datos antiguas.
+ */
+const DEMO_PASSWORD_HASH = '$2a$10$oeMFaVfquf/BWyFhkKmh.upF3lNucd/f8.jq4pajD5Sl10zCwwU.e';
+
+/**
+ * Migraciones idempotentes (patrón del repo: ALTER/CREATE ... IF NOT EXISTS).
+ * Se ejecutan una vez al arrancar el servidor.
+ */
+export async function ensureRadarAndGpsSchema(): Promise<void> {
+  try {
+    // ---------- GPS en tiempo real ----------
+    await query(`
+      -- route_history debe permitir domiciliario sin vehículo asignado
+      ALTER TABLE route_history ALTER COLUMN vehicle_id DROP NOT NULL;
+      ALTER TABLE route_history ADD COLUMN IF NOT EXISTS driver_id INT REFERENCES users(id);
+      ALTER TABLE route_history ADD COLUMN IF NOT EXISTS heading DECIMAL(5,2);
+      ALTER TABLE route_history ADD COLUMN IF NOT EXISTS accuracy DECIMAL(8,2);
+      CREATE INDEX IF NOT EXISTS idx_route_driver ON route_history(driver_id, recorded_at);
+
+      -- Validacion JWT en tiempo real
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT DEFAULT 1;
+
+      -- Perfiles de Comercios tipo Facebook y campos nuevos de restaurantes
+      ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS cover_url VARCHAR(500);
+      ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS category VARCHAR(100);
+      ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS subscription_plan VARCHAR(50);
+      ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS cover_url VARCHAR(500);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS motivo TEXT;
+
+      -- Columnas que el código de entregas usa pero el esquema base no incluía
+      ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS confirmation_code VARCHAR(10);
+      ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS actual_delivery_time TIMESTAMP NULL;
+
+      -- Asignación de vehículo por usuario (antes: DDL en el top-level de routes/users.ts,
+      -- que se ejecutaba ANTES de crear el esquema y fallaba en silencio en bases nuevas)
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS vehicle_type VARCHAR(50);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS vehicle_plate VARCHAR(50);
+
+      -- Vehículo con conductor asignado y proveedor opcional (antes: DDL en el top-level
+      -- de routes/deliveries.ts, mismo problema de orden en bases nuevas)
+      ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS driver_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE vehicles ALTER COLUMN supplier_id DROP NOT NULL;
+
+      -- Última posición del domiciliario (clave por usuario, no por vehículo)
+      CREATE TABLE IF NOT EXISTS driver_locations (
+        driver_id   INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        delivery_id INT NULL REFERENCES deliveries(id) ON DELETE SET NULL,
+        lat         DECIMAL(10,8) NOT NULL,
+        lng         DECIMAL(11,8) NOT NULL,
+        speed       DECIMAL(6,2),
+        heading     DECIMAL(5,2),
+        accuracy    DECIMAL(8,2),
+        recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- ---------- Radar de Stock ----------
+      CREATE TABLE IF NOT EXISTS radar_shares (
+        id SERIAL PRIMARY KEY,
+        restaurant_id INT NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        supplier_id   INT NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+        scope         VARCHAR(20) DEFAULT 'todo',
+        category      VARCHAR(100) NULL,
+        inventory_id  INT NULL REFERENCES inventory(id) ON DELETE CASCADE,
+        share_level   VARCHAR(20) DEFAULT 'semaforo',
+        alert_on      VARCHAR(20) DEFAULT 'critical',
+        is_active     BOOLEAN DEFAULT TRUE,
+        created_by    INT REFERENCES users(id),
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_radar_shares
+        ON radar_shares(restaurant_id, supplier_id, scope, COALESCE(category,''), COALESCE(inventory_id,0));
+      CREATE INDEX IF NOT EXISTS idx_radar_shares_supplier ON radar_shares(supplier_id, is_active);
+      CREATE INDEX IF NOT EXISTS idx_radar_shares_restaurant ON radar_shares(restaurant_id, is_active);
+
+      CREATE TABLE IF NOT EXISTS radar_alerts (
+        id SERIAL PRIMARY KEY,
+        restaurant_id INT NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        supplier_id   INT NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+        inventory_id  INT NOT NULL REFERENCES inventory(id) ON DELETE CASCADE,
+        level         VARCHAR(20) NOT NULL,
+        unit          VARCHAR(30),
+        suggested_qty DECIMAL(10,2),
+        status        VARCHAR(20) DEFAULT 'abierta',
+        opened_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at    TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP + interval '24 hours')
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_radar_alert_open
+        ON radar_alerts(restaurant_id, supplier_id, inventory_id) WHERE status = 'abierta';
+      CREATE INDEX IF NOT EXISTS idx_radar_alerts_supplier ON radar_alerts(supplier_id, status);
+
+      CREATE TABLE IF NOT EXISTS radar_offers (
+        id SERIAL PRIMARY KEY,
+        alert_id      INT NOT NULL REFERENCES radar_alerts(id) ON DELETE CASCADE,
+        supplier_id   INT NOT NULL REFERENCES suppliers(id),
+        product_name  VARCHAR(200) NOT NULL,
+        unit          VARCHAR(30),
+        offered_qty   DECIMAL(10,2) NOT NULL,
+        offered_price DECIMAL(12,2) NOT NULL,
+        eta_hours     INT DEFAULT 24,
+        notes         TEXT,
+        status        VARCHAR(20) DEFAULT 'pendiente',
+        order_id      INT NULL REFERENCES orders(id) ON DELETE SET NULL,
+        created_by    INT REFERENCES users(id),
+        created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        valid_until   TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP + interval '12 hours')
+      );
+      CREATE INDEX IF NOT EXISTS idx_radar_offers_status ON radar_offers(status, valid_until);
+      CREATE INDEX IF NOT EXISTS idx_radar_offers_alert ON radar_offers(alert_id);
+
+      -- Purchase orders (drafts)
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'purchase_order_status') THEN
+          CREATE TYPE purchase_order_status AS ENUM ('borrador','enviada','confirmada','cancelada');
+        END IF;
+      END$$;
+      CREATE TABLE IF NOT EXISTS purchase_orders (
+        id SERIAL PRIMARY KEY,
+        order_code VARCHAR(30) NOT NULL UNIQUE,
+        restaurant_id INT NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        supplier_id INT NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+        status purchase_order_status NOT NULL DEFAULT 'borrador',
+        subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
+        total DECIMAL(12,2) NOT NULL DEFAULT 0,
+        notes TEXT,
+        created_by INT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS purchase_order_items (
+        id SERIAL PRIMARY KEY,
+        purchase_order_id INT NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+        product_id INT REFERENCES products(id) ON DELETE SET NULL,
+        name VARCHAR(200) NOT NULL,
+        quantity DECIMAL(10,2) NOT NULL,
+        unit VARCHAR(30) NOT NULL,
+        unit_price DECIMAL(12,2) NOT NULL DEFAULT 0,
+        subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_po_restaurant ON purchase_orders(restaurant_id);
+      CREATE INDEX IF NOT EXISTS idx_po_supplier ON purchase_orders(supplier_id);
+      CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
+      CREATE INDEX IF NOT EXISTS idx_po_created ON purchase_orders(created_at);
+      CREATE INDEX IF NOT EXISTS idx_po_item_po ON purchase_order_items(purchase_order_id);
+      CREATE INDEX IF NOT EXISTS idx_po_item_product ON purchase_order_items(product_id);
+      CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+      CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id);
+      CREATE INDEX IF NOT EXISTS idx_products_supplier ON products(supplier_id);
+
+      -- Permiso Analytics
+      INSERT INTO permissions (name, description)
+      VALUES ('analytics', 'Ver analitica y KPIs de la plataforma')
+      ON CONFLICT (name) DO NOTHING;
+      INSERT INTO permissions (name, description)
+      VALUES ('compras:write', 'Crear y gestionar ordenes de compra')
+      ON CONFLICT (name) DO NOTHING;
+
+      -- El rol admin (role_id 1) recibe TODOS los permisos existentes.
+      -- Necesario porque requirePermission ya no tiene un bypass por rol.
+      INSERT INTO role_permissions (role_id, permission_id)
+      SELECT r.id, p.id FROM roles r, permissions p
+      WHERE r.name = 'admin'
+      ON CONFLICT DO NOTHING;
+
+      -- Garantizar que usuarios proveedor tengan supplier_id asignado
+      UPDATE users SET supplier_id = 1 WHERE username IN ('proveedor', 'domiciliario') AND supplier_id IS NULL;
+      UPDATE users u
+      SET supplier_id = (SELECT s.id FROM suppliers s ORDER BY s.id ASC LIMIT 1)
+      WHERE u.role_id = 4 AND u.supplier_id IS NULL AND EXISTS (SELECT 1 FROM suppliers);
+    `);
+    console.log('[DB] Esquema Radar de Stock + GPS verificado.');
+
+    // Semilla idempotente de direcciones/coordenadas de Bucaramanga.
+    // Antes vivía en el top-level de routes/deliveries.ts (mismo problema de orden).
+    try {
+      await query(`
+        UPDATE deliveries
+        SET dest_lat = 7.1168, dest_lng = -73.1095,
+            delivery_address = 'Carrera 35 #48-22, Cabecera del Llano, Bucaramanga'
+        WHERE id % 4 = 1;
+
+        UPDATE deliveries
+        SET dest_lat = 7.0665, dest_lng = -73.1030,
+            delivery_address = 'Calle 30 #26-10, Parque Caracolí / Cañaveral, Floridablanca'
+        WHERE id % 4 = 2;
+
+        UPDATE deliveries
+        SET dest_lat = 7.0845, dest_lng = -73.1175,
+            delivery_address = 'Calle 105 #24-32, Provenza, Bucaramanga'
+        WHERE id % 4 = 3;
+
+        UPDATE deliveries
+        SET dest_lat = 7.0984, dest_lng = -73.1090,
+            delivery_address = 'Transversal 93 #34-99, El Tejar / C.C. Cacique, Bucaramanga'
+        WHERE id % 4 = 0;
+
+        UPDATE vehicles
+        SET current_lat = 7.1320, current_lng = -73.1650
+        WHERE id % 3 = 1;
+
+        UPDATE vehicles
+        SET current_lat = 7.0850, current_lng = -73.1680
+        WHERE id % 3 = 2;
+
+        UPDATE vehicles
+        SET current_lat = 7.1235, current_lng = -73.1285
+        WHERE id % 3 = 0;
+      `);
+    } catch (e) {
+      console.warn('[DB] Advertencia sembrando coordenadas de Bucaramanga:', e);
+    }
+    
+    // Indice unico parcial contabilidad
+    try {
+      await query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_accounting_invoice_ingreso
+        ON accounting_transactions (reference_type, reference_id, type)
+        WHERE reference_type = 'invoice';
+      `);
+    } catch (e) {
+      console.warn('[DB] Advertencia creando índice uq_accounting_invoice_ingreso:', e);
+    }
+  } catch (err) {
+    console.error('[DB] Error aplicando esquema Radar/GPS:', err);
+  }
+}
+
+/** Repara hashes de cuentas semilla antiguas que usaban un placeholder inválido (backdoor). */
+export async function repairLegacySeedPasswords(): Promise<void> {
+  try {
+    const res = await query(
+      `UPDATE users
+          SET password_hash = $1, token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP
+        WHERE password_hash LIKE '$2b$10$DefaulthashForDemo%'`,
+      [DEMO_PASSWORD_HASH]
+    );
+    if (res.rowCount) {
+      console.log(`[DB] Hashes semilla heredados reparados: ${res.rowCount}`);
+    }
+  } catch (err) {
+    console.error('[DB] Error reparando contraseñas semilla antiguas:', err);
+  }
+}
+
+/** Cierra alertas y ofertas vencidas. Se ejecuta cada hora. */export async function expireRadarItems(): Promise<void> {
+  try {
+    await query(
+      `UPDATE radar_alerts SET status = 'expirada'
+        WHERE status IN ('abierta', 'ofertada') AND expires_at < CURRENT_TIMESTAMP`
+    );
+    await query(
+      `UPDATE radar_offers SET status = 'expirada'
+        WHERE status = 'pendiente' AND valid_until < CURRENT_TIMESTAMP`
+    );
+  } catch (err) {
+    console.error('[Radar] Error expirando alertas/ofertas:', err);
+  }
+}
+
+export async function dropLegacyPlatformViews(): Promise<void> {
+  try {
+    await query(`
+      DROP VIEW IF EXISTS v_platform_kpis;
+      DROP VIEW IF EXISTS v_sales_by_day;
+      DROP VIEW IF EXISTS v_orders_by_status;
+      DROP VIEW IF EXISTS v_top_products;
+      DROP VIEW IF EXISTS v_top_suppliers;
+    `);
+    console.log('[DB] Vistas de KPIs (Legacy) borradas sin CASCADE.');
+  } catch (err) {
+    console.error('[DB] Error borrando vistas de KPIs:', err);
+  }
+}
+
+let initPromise: Promise<void> | null = null;
+export async function ensureServerInitialized(): Promise<void> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      try {
+        const { initDatabase } = await import('../config/db');
+        await initDatabase();
+        await ensureRadarAndGpsSchema();
+        await repairLegacySeedPasswords();
+        await dropLegacyPlatformViews();
+        await expireRadarItems();
+      } catch (err) {
+        initPromise = null;
+        console.error('[DB] Error inicializando servidor y base de datos:', err);
+      }
+    })();
+  }
+  return initPromise;
+}
+
