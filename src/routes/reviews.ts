@@ -11,7 +11,7 @@ router.get('/', async (req, res, next) => {
     const { supplier_id } = req.query;
     const params: unknown[] = [];
     let sql = `SELECT rv.*, s.name AS supplier_name
-               FROM "Reseña" rv
+               FROM reseña rv
                JOIN suppliers s ON s.id = rv.supplier_id`;
     if (supplier_id) {
       params.push(supplier_id);
@@ -37,13 +37,13 @@ router.post('/', roleRequired('gerente', 'empleado', 'admin'), async (req, res, 
     }
     const userRow = await query('SELECT name FROM users WHERE id = $1', [user.id]);
     const result = await query(
-      `INSERT INTO "Reseña" (supplier_id, reviewer_name, rating, comment, created_by)
+      `INSERT INTO reseña (supplier_id, reviewer_name, rating, comment, created_by)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
       [supplier_id, userRow.rows[0]?.name ?? user.username, rating, comment, user.id]
     );
     const agg = await query(
       `SELECT ROUND(AVG(rating)::numeric, 1) AS rating, COUNT(*)::int AS review_count
-       FROM "Reseña" WHERE supplier_id = $1`,
+       FROM reseña WHERE supplier_id = $1`,
       [supplier_id]
     );
     await query('UPDATE suppliers SET rating = $1, review_count = $2 WHERE id = $3', [

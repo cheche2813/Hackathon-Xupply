@@ -47,14 +47,14 @@ Backend completo de la plataforma B2B: catálogo, pedidos, inventario (FEFO), fa
 2. **Variables de entorno**: copia `.env.example` a `.env` y configura como mínimo:
    ```env
    PORT=4000
-   DATABASE_URL=postgres://usuario:password@localhost:5432/zupply
+   DATABASE_URL=postgres://usuario:password@localhost:5432/xupply
    JWT_SECRET=<secreto-largo-aleatorio>
    CLIENT_ORIGIN=http://localhost:5173
    ```
 
-3. **Base de datos**: crea la base en PostgreSQL (por ejemplo `zupply`) y arranca el servidor; el esquema se crea/actualiza solo. Si prefieres hacerlo manual:
+3. **Base de datos**: crea la base en PostgreSQL (por ejemplo `xupply`) y arranca el servidor; el esquema se crea/actualiza solo. Si prefieres hacerlo manual:
    ```bash
-   psql -U postgres -d zupply -f Xupply_postgresql.sql
+   psql -U postgres -d xupply -f Xupply_postgresql.sql
    ```
 
 4. **Modo desarrollo**

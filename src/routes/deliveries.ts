@@ -145,46 +145,6 @@ router.get('/live', async (req, res, next) => {
   }
 });
 
-// Asegurar columnas de asignación de vehículos y coordenadas reales en Bucaramanga
-query(`
-  ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS driver_id INT;
-  ALTER TABLE vehicles ALTER COLUMN supplier_id DROP NOT NULL;
-
-  -- Actualizar destinos de entregas existentes con direcciones reales emblemáticas de Bucaramanga
-  UPDATE deliveries
-  SET dest_lat = 7.1168, dest_lng = -73.1095,
-      delivery_address = 'Carrera 35 #48-22, Cabecera del Llano, Bucaramanga'
-  WHERE id % 4 = 1;
-
-  UPDATE deliveries
-  SET dest_lat = 7.0665, dest_lng = -73.1030,
-      delivery_address = 'Calle 30 #26-10, Parque Caracolí / Cañaveral, Floridablanca'
-  WHERE id % 4 = 2;
-
-  UPDATE deliveries
-  SET dest_lat = 7.0845, dest_lng = -73.1175,
-      delivery_address = 'Calle 105 #24-32, Provenza, Bucaramanga'
-  WHERE id % 4 = 3;
-
-  UPDATE deliveries
-  SET dest_lat = 7.0984, dest_lng = -73.1090,
-      delivery_address = 'Transversal 93 #34-99, El Tejar / C.C. Cacique, Bucaramanga'
-  WHERE id % 4 = 0;
-
-  -- Actualizar coordenadas de vehículos en hubs logísticos reales
-  UPDATE vehicles
-  SET current_lat = 7.1320, current_lng = -73.1650
-  WHERE id % 3 = 1;
-
-  UPDATE vehicles
-  SET current_lat = 7.0850, current_lng = -73.1680
-  WHERE id % 3 = 2;
-
-  UPDATE vehicles
-  SET current_lat = 7.1235, current_lng = -73.1285
-  WHERE id % 3 = 0;
-`).catch(() => undefined);
-
 router.get('/vehicles', roleRequired('proveedor_admin', 'admin', 'gerente'), async (req, res, next) => {
   try {
     const user = req.user!;

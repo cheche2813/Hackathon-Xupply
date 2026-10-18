@@ -29,7 +29,7 @@ export function resolveDatabaseUrl(): { url: string; isConfigured: boolean; sour
     };
   }
   return {
-    url: 'postgres://postgres:postgres@127.0.0.1:5432/zupply',
+    url: 'postgres://postgres:postgres@127.0.0.1:5432/xupply',
     isConfigured: false,
     source: 'default_localhost',
   };

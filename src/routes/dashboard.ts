@@ -95,7 +95,7 @@ router.get('/summary', async (req, res, next) => {
     let monthly_history = monthlyHistoryRes.rows;
     if (monthly_history.length === 0) {
       monthly_history = [
-        { month_key: '2026-09', month_name: 'Septiembre', orders_count: Number(orders.rows[0].total) || 4, total_amount: Number(orders.rows[0].monto_total) || 1250000 },
+        { month_key: '2026-09', month_name: 'Septiembre', orders_count: Number(orders.total) || 4, total_amount: Number(orders.monto_total) || 1250000 },
         { month_key: '2026-08', month_name: 'Agosto', orders_count: 8, total_amount: 2840000 },
         { month_key: '2026-07', month_name: 'Julio', orders_count: 6, total_amount: 1980000 },
       ];

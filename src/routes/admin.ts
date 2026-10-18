@@ -622,15 +622,26 @@ router.put('/roles/:id/permissions', requirePermission('config'), async (req: Re
     
     const oldPerms = await query('SELECT permission_id FROM role_permissions WHERE role_id = $1', [numericId]);
     
-    // Iniciar transacción explícita
-    await query('BEGIN');
-    await query('DELETE FROM role_permissions WHERE role_id = $1', [numericId]);
-    
-    for (const pId of permissions) {
-      await query('INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)', [numericId, pId]);
+    // Transacción real sobre una única conexión del pool.
+    // Antes BEGIN/DELETE/INSERT/COMMIT/ROLLBACK iban por query() => cada llamada podía
+    // caer en una conexión distinta, así que NO había transacción y se dejaban
+    // conexiones "idle in transaction".
+    const client = await require('../config/db').pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM role_permissions WHERE role_id = $1', [numericId]);
+
+      for (const pId of permissions) {
+        await client.query('INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)', [numericId, pId]);
+      }
+
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
     }
-    
-    await query('COMMIT');
     
     // Invalidar tokens de los usuarios afectados para forzar actualizacion de RBAC local
     await query('UPDATE users SET token_version = token_version + 1 WHERE role_id = $1', [numericId]);
@@ -644,7 +655,6 @@ router.put('/roles/:id/permissions', requirePermission('config'), async (req: Re
     
     res.json({ ok: true, count: permissions.length });
   } catch (err) {
-    await query('ROLLBACK');
     next(err);
   }
 });
