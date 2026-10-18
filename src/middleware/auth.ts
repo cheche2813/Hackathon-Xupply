@@ -10,6 +10,7 @@ export interface AuthUser {
   restaurant_id: number | null;
   supplier_id: number | null;
   branch_id: number | null;
+  name?: string;
   token_version?: number;
 }
 
@@ -21,7 +22,21 @@ declare global {
   }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'xupply-secret-change-me';
+const RAW_JWT_SECRET = process.env.JWT_SECRET;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
+
+if (!RAW_JWT_SECRET || !RAW_JWT_SECRET.trim()) {
+  const message =
+    '[Auth] JWT_SECRET no está configurado. Define la variable de entorno JWT_SECRET ' +
+    'con un valor largo y aleatorio antes de iniciar el servidor.';
+  if (IS_PRODUCTION) {
+    // No arrancar en producción con un secreto por defecto: permitiría falsificar tokens.
+    throw new Error(message);
+  }
+  console.warn(`${message} Usando un secreto SOLO para desarrollo.`);
+}
+
+const JWT_SECRET = (RAW_JWT_SECRET && RAW_JWT_SECRET.trim()) || 'dev-only-insecure-secret-change-me';
 
 const permissionCache = new Map<number, Set<string>>();
 let cacheLoaded = false;
@@ -67,9 +82,9 @@ export async function authRequired(req: Request, res: Response, next: NextFuncti
       return res.status(401).json({ error: 'Cuenta inactiva o eliminada' });
     }
     
-    // Si el token tiene version, compararla. Si el token es antiguo (antes de agregar la columna),
-    // se considerará válido hasta que se venza o se requiera forzosamente.
-    if (decoded.token_version !== undefined && userCheck.rows[0].token_version !== decoded.token_version) {
+    // Comparar SIEMPRE la versión del token contra la de la BD. Los tokens sin versión
+    // (emitidos antes de habilitar esta columna) se rechazan para forzar un nuevo inicio de sesión.
+    if (Number(decoded.token_version ?? -1) !== Number(userCheck.rows[0].token_version)) {
       return res.status(401).json({ error: 'Sesión invalidada por cambios en la cuenta. Por favor inicie sesión nuevamente.' });
     }
 
@@ -93,7 +108,8 @@ export function roleRequired(...roles: string[]) {
 export function requirePermission(...permissionNames: string[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: 'No autenticado' });
-    if (req.user.role === 'admin') return next();
+    // Sin bypass por rol: incluso 'admin' pasa solo si su rol tiene el permiso.
+    // El rol admin (role_id 1) recibe todos los permisos en la siembra/migración.
     await loadPermissions();
     const userPerms = permissionCache.get(req.user.role_id) ?? new Set();
     const hasPermission = permissionNames.some((p) => userPerms.has(p));

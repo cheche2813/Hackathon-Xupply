@@ -1,5 +1,12 @@
 -- ============================================================
--- XUPLLY IA - Esquema de Base de Datos PostgreSQL
+-- Esquema canonico PostgreSQL de Xupply.
+-- Generado desde src/config/schemaSql.ts (el servidor lo auto-crea al
+-- arrancar si la base esta vacia). Es idempotente: se puede ejecutar
+-- varias veces sin errores.
+-- ============================================================
+
+-- ============================================================
+-- XUPPLY IA - Esquema de Base de Datos PostgreSQL
 -- Plataforma B2B ERP / Ecosistema Logístico con IA
 -- Surtesoft - v2.0
 -- ============================================================
@@ -7,17 +14,41 @@
 -- ------------------------------------------------------------
 -- TIPOS ENUM personalizados
 -- ------------------------------------------------------------
-CREATE TYPE order_status AS ENUM ('nuevo', 'confirmado', 'preparando', 'despachado', 'en_camino', 'entregado', 'cancelado');
-CREATE TYPE invoice_mode AS ENUM ('electronica', 'pos', 'comandas');
-CREATE TYPE invoice_id_type AS ENUM ('nit', 'cedula', 'email', 'Pasaporte');
-CREATE TYPE payment_method AS ENUM ('Efectivo', 'Tarjeta', 'Nequi', 'PSE', 'Daviplata', 'Credito');
-CREATE TYPE invoice_status AS ENUM ('borrador', 'emitida', 'pagada', 'anulada');
-CREATE TYPE inventory_stock_status AS ENUM ('critical', 'low', 'normal');
-CREATE TYPE accounting_type AS ENUM ('ingreso', 'egreso');
-CREATE TYPE vehicle_type AS ENUM ('moto', 'furgon', 'camion', 'camioneta');
-CREATE TYPE vehicle_status AS ENUM ('disponible', 'en_ruta', 'cargando', 'mantenimiento');
-CREATE TYPE delivery_status AS ENUM ('asignado', 'en_camino', 'llegando', 'entregado', 'fallido');
-CREATE TYPE inventory_movement_type AS ENUM ('entrada', 'salida', 'ajuste', 'merma');
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'order_status') THEN
+    CREATE TYPE order_status AS ENUM ('nuevo', 'confirmado', 'preparando', 'despachado', 'en_camino', 'entregado', 'cancelado');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoice_mode') THEN
+    CREATE TYPE invoice_mode AS ENUM ('electronica', 'pos', 'comandas');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoice_id_type') THEN
+    CREATE TYPE invoice_id_type AS ENUM ('nit', 'cedula', 'email', 'Pasaporte');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_method') THEN
+    CREATE TYPE payment_method AS ENUM ('Efectivo', 'Tarjeta', 'Nequi', 'PSE', 'Daviplata', 'Credito');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invoice_status') THEN
+    CREATE TYPE invoice_status AS ENUM ('borrador', 'emitida', 'pagada', 'anulada');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'inventory_stock_status') THEN
+    CREATE TYPE inventory_stock_status AS ENUM ('critical', 'low', 'normal');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'accounting_type') THEN
+    CREATE TYPE accounting_type AS ENUM ('ingreso', 'egreso');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'vehicle_type') THEN
+    CREATE TYPE vehicle_type AS ENUM ('moto', 'furgon', 'camion', 'camioneta');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'vehicle_status') THEN
+    CREATE TYPE vehicle_status AS ENUM ('disponible', 'en_ruta', 'cargando', 'mantenimiento');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'delivery_status') THEN
+    CREATE TYPE delivery_status AS ENUM ('asignado', 'en_camino', 'llegando', 'entregado', 'fallido');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'inventory_movement_type') THEN
+    CREATE TYPE inventory_movement_type AS ENUM ('entrada', 'salida', 'ajuste', 'merma');
+  END IF;
+END $$;
 
 -- ------------------------------------------------------------
 -- TABLA: roles
@@ -63,6 +94,8 @@ CREATE TABLE IF NOT EXISTS restaurants (
   city VARCHAR(100) DEFAULT 'Bucaramanga',
   department VARCHAR(100) DEFAULT 'Santander',
   logo_url VARCHAR(500),
+  category VARCHAR(100),
+  subscription_plan VARCHAR(50),
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -96,7 +129,7 @@ CREATE TABLE IF NOT EXISTS users (
   role_id INT NOT NULL REFERENCES roles(id),
   restaurant_id INT REFERENCES restaurants(id) ON DELETE SET NULL,
   branch_id INT REFERENCES branches(id) ON DELETE SET NULL,
-  xupplier_id INT,
+  supplier_id INT,
   avatar_url VARCHAR(500),
   is_active BOOLEAN DEFAULT TRUE,
   last_login TIMESTAMP NULL,
@@ -105,9 +138,9 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- ------------------------------------------------------------
--- TABLA: xuppliers
+-- TABLA: suppliers
 -- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS xuppliers (
+CREATE TABLE IF NOT EXISTS suppliers (
   id SERIAL PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
   nit VARCHAR(20) UNIQUE,
@@ -123,9 +156,14 @@ CREATE TABLE IF NOT EXISTS xuppliers (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
--- FK de users hacia xuppliers
-ALTER TABLE users ADD CONSTRAINT fk_users_xupplier
-  FOREIGN KEY (xupplier_id) REFERENCES xuppliers(id) ON DELETE SET NULL;
+
+-- FK de users hacia suppliers
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_users_supplier') THEN
+    ALTER TABLE users ADD CONSTRAINT fk_users_supplier
+      FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 -- ------------------------------------------------------------
 -- TABLA: product_categories
@@ -144,7 +182,7 @@ CREATE TABLE IF NOT EXISTS product_categories (
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS products (
   id SERIAL PRIMARY KEY,
-  xupplier_id INT NOT NULL REFERENCES xuppliers(id) ON DELETE CASCADE,
+  supplier_id INT NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
   category_id INT REFERENCES product_categories(id) ON DELETE SET NULL,
   name VARCHAR(200) NOT NULL,
   description TEXT,
@@ -177,7 +215,7 @@ CREATE TABLE IF NOT EXISTS inventory (
   batch_date DATE,
   expiry_date DATE,
   stock_status inventory_stock_status DEFAULT 'normal',
-  xupplier_id INT REFERENCES xuppliers(id) ON DELETE SET NULL,
+  supplier_id INT REFERENCES suppliers(id) ON DELETE SET NULL,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -224,7 +262,7 @@ CREATE TABLE IF NOT EXISTS orders (
   order_code VARCHAR(20) NOT NULL UNIQUE,
   restaurant_id INT NOT NULL REFERENCES restaurants(id),
   branch_id INT REFERENCES branches(id) ON DELETE SET NULL,
-  xupplier_id INT NOT NULL REFERENCES xuppliers(id),
+  supplier_id INT NOT NULL REFERENCES suppliers(id),
   status order_status DEFAULT 'nuevo',
   total DECIMAL(12,2) DEFAULT 0,
   notes TEXT,
@@ -240,7 +278,7 @@ CREATE TABLE IF NOT EXISTS orders (
 
 CREATE INDEX idx_orders_status ON orders(status);
 CREATE INDEX idx_orders_restaurant ON orders(restaurant_id);
-CREATE INDEX idx_orders_xupplier ON orders(xupplier_id);
+CREATE INDEX idx_orders_supplier ON orders(supplier_id);
 CREATE INDEX idx_orders_created ON orders(created_at);
 
 -- ------------------------------------------------------------
@@ -268,7 +306,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   cufe VARCHAR(100),
   mode invoice_mode DEFAULT 'electronica',
   restaurant_id INT NOT NULL REFERENCES restaurants(id),
-  xupplier_id INT REFERENCES xuppliers(id) ON DELETE SET NULL,
+  supplier_id INT REFERENCES suppliers(id) ON DELETE SET NULL,
   order_id INT REFERENCES orders(id) ON DELETE SET NULL,
   client_name VARCHAR(200),
   client_id_number VARCHAR(30),
@@ -283,6 +321,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   total DECIMAL(12,2) DEFAULT 0,
   payment_method payment_method DEFAULT 'Efectivo',
   status invoice_status DEFAULT 'borrador',
+  motivo TEXT,
   mesa VARCHAR(10),
   mesero VARCHAR(100),
   issued_at TIMESTAMP NULL,
@@ -310,11 +349,11 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 );
 
 -- ------------------------------------------------------------
--- TABLA: xupplier_reviews
+-- TABLA: supplier_reviews
 -- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS xupplier_reviews (
+CREATE TABLE IF NOT EXISTS Reseña (
   id SERIAL PRIMARY KEY,
-  xupplier_id INT NOT NULL REFERENCES xuppliers(id) ON DELETE CASCADE,
+  supplier_id INT NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
   reviewer_name VARCHAR(200),
   rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
   comment TEXT,
@@ -349,7 +388,7 @@ CREATE INDEX idx_accounting_type ON accounting_transactions(type);
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS vehicles (
   id SERIAL PRIMARY KEY,
-  xupplier_id INT NOT NULL REFERENCES xuppliers(id) ON DELETE CASCADE,
+  supplier_id INT NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
   name VARCHAR(100) NOT NULL,
   plate VARCHAR(20) NOT NULL,
   type vehicle_type DEFAULT 'moto',
@@ -358,10 +397,17 @@ CREATE TABLE IF NOT EXISTS vehicles (
   current_lat DECIMAL(10,8) NULL,
   current_lng DECIMAL(11,8) NULL,
   last_location_update TIMESTAMP NULL,
+  imei VARCHAR(20) NULL,
+  gps_validated BOOLEAN DEFAULT FALSE,
+  gps_last_seen TIMESTAMP NULL,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS imei VARCHAR(20) NULL;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS gps_validated BOOLEAN DEFAULT FALSE;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS gps_last_seen TIMESTAMP NULL;
 
 -- ------------------------------------------------------------
 -- TABLA: deliveries
@@ -465,17 +511,29 @@ END;
 $$ language 'plpgsql';
 
 -- Aplicar trigger a todas las tablas con updated_at
+DROP TRIGGER IF EXISTS update_roles_updated_at ON roles;
 CREATE TRIGGER update_roles_updated_at BEFORE UPDATE ON roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_restaurants_updated_at ON restaurants;
 CREATE TRIGGER update_restaurants_updated_at BEFORE UPDATE ON restaurants FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_branches_updated_at ON branches;
 CREATE TRIGGER update_branches_updated_at BEFORE UPDATE ON branches FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_xuppliers_updated_at BEFORE UPDATE ON xuppliers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_suppliers_updated_at ON suppliers;
+CREATE TRIGGER update_suppliers_updated_at BEFORE UPDATE ON suppliers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_products_updated_at ON products;
 CREATE TRIGGER update_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_inventory_updated_at ON inventory;
 CREATE TRIGGER update_inventory_updated_at BEFORE UPDATE ON inventory FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_menu_products_updated_at ON menu_products;
 CREATE TRIGGER update_menu_products_updated_at BEFORE UPDATE ON menu_products FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
 CREATE TRIGGER update_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_invoices_updated_at ON invoices;
 CREATE TRIGGER update_invoices_updated_at BEFORE UPDATE ON invoices FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_vehicles_updated_at ON vehicles;
 CREATE TRIGGER update_vehicles_updated_at BEFORE UPDATE ON vehicles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS update_deliveries_updated_at ON deliveries;
 CREATE TRIGGER update_deliveries_updated_at BEFORE UPDATE ON deliveries FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================
@@ -488,11 +546,12 @@ INSERT INTO roles (name, display_name, description) VALUES
 ('gerente', 'Gerente', 'Gestion de pedidos, reportes y facturacion'),
 ('empleado', 'Empleado', 'Acceso operativo a inventario y comandas'),
 ('proveedor_admin', 'Proveedor Admin', 'Catalogo digital, recepcion de pedidos y despachos'),
-('domiciliario', 'Domiciliario', 'Rutas asignadas, entregas y GPS');
+('domiciliario', 'Domiciliario', 'Rutas asignadas, entregas y GPS') ON CONFLICT (name) DO NOTHING;
 
 -- Permisos
 INSERT INTO permissions (name, description) VALUES
 ('dashboard', 'Ver dashboard ejecutivo'),
+('analytics', 'Ver analitica y KPIs de la plataforma'),
 ('pedidos', 'Ver pedidos'),
 ('pedidos:write', 'Crear/editar pedidos'),
 ('inventario', 'Ver inventario'),
@@ -511,11 +570,11 @@ INSERT INTO permissions (name, description) VALUES
 ('prov:gps', 'GPS del proveedor'),
 ('prov:inventario', 'Ver inventario del proveedor'),
 ('prov:inventario:write', 'Gestionar inventario del proveedor'),
-('prov:precios', 'Gestionar precios del proveedor');
+('prov:precios', 'Gestionar precios del proveedor') ON CONFLICT (name) DO NOTHING;
 
 -- Relacion roles-permisos
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT 1, id FROM permissions;
+SELECT 1, id FROM permissions ON CONFLICT DO NOTHING;
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT 2, id FROM permissions WHERE name IN (
@@ -548,8 +607,8 @@ INSERT INTO branches (restaurant_id, name, address, is_main) VALUES
 (4, 'Sede Cordoba', 'Calle 50 #12-45, Cordoba', TRUE),
 (5, 'Sede Cabecera', 'Cra 30 #55-18, Cabecera', TRUE);
 
--- Proveedores (xuppliers)
-INSERT INTO xuppliers (name, nit, category, phone, email, address, city, rating, review_count) VALUES
+-- Proveedores
+INSERT INTO suppliers (name, nit, category, phone, email, address, city, rating, review_count) VALUES
 ('Carnes El Paisa S.A.S', '900111222-3', 'Carnes', '(607) 634-1111', 'ventas@carneelpaisa.com', 'Via 40 #15-20, Zona Industrial', 'Bucaramanga', 4.7, 45),
 ('Lacteos del Norte', '900333444-5', 'Lacteos', '(607) 634-2222', 'pedidos@lacteosnorte.com', 'Cra 8 #20-30, La Cordova', 'Bucaramanga', 4.5, 32),
 ('Mariscos del Caribe', '900555666-7', 'Mariscos', '(607) 634-3333', 'ventas@mariscoscaribe.com', 'Calle 25 #10-15, San Francisco', 'Bucaramanga', 4.8, 28),
@@ -567,10 +626,10 @@ INSERT INTO product_categories (name, icon, sort_order) VALUES
 ('Frutas', '🍎', 7),
 ('Bebidas', '🥤', 8),
 ('Granos', '🫘', 9),
-('Condimentos', '🧂', 10);
+('Condimentos', '🧂', 10) ON CONFLICT (name) DO NOTHING;
 
 -- Productos catalogo B2B
-INSERT INTO products (xupplier_id, category_id, name, unit, price_per_unit, stock_available) VALUES
+INSERT INTO products (supplier_id, category_id, name, unit, price_per_unit, stock_available) VALUES
 (1, 1, 'Carne de res 90/10', 'kg', 29000, 500),
 (1, 1, 'Carne molida', 'kg', 22000, 300),
 (1, 1, 'Costilla de res', 'kg', 18000, 200),
@@ -590,7 +649,7 @@ INSERT INTO products (xupplier_id, category_id, name, unit, price_per_unit, stoc
 (5, 8, 'Jugo natural', 'litro', 4000, 200);
 
 -- Inventario demo
-INSERT INTO inventory (restaurant_id, branch_id, name, category, unit, current_stock, min_stock, max_stock, avg_daily_usage, cost_per_unit, batch_date, expiry_date, stock_status, xupplier_id) VALUES
+INSERT INTO inventory (restaurant_id, branch_id, name, category, unit, current_stock, min_stock, max_stock, avg_daily_usage, cost_per_unit, batch_date, expiry_date, stock_status, supplier_id) VALUES
 (1, 1, 'Carne de res 90/10', 'Res', 'kg', 180, 50, 300, 25, 29000, '2026-08-10', '2026-08-25', 'normal', 1),
 (1, 1, 'Carne molida', 'Res', 'kg', 95, 30, 200, 15, 22000, '2026-08-12', '2026-08-27', 'normal', 1),
 (1, 1, 'Costilla de res', 'Res', 'kg', 60, 20, 150, 10, 18000, '2026-08-11', '2026-08-26', 'normal', 1),
@@ -617,11 +676,11 @@ INSERT INTO menu_products (restaurant_id, name, category, price) VALUES
 
 -- Usuarios demo
 INSERT INTO users (username, password_hash, name, email, role_id, restaurant_id, branch_id) VALUES
-('admin', '$2b$10$DefaulthashForDemo123456789012345678901234567890', 'Carlos Rueda', 'admin@ranchogrande.com', 1, 1, 1),
-('gerente', '$2b$10$DefaulthashForDemo123456789012345678901234567890', 'Laura Vargas', 'gerente@ranchogrande.com', 2, 1, 1),
-('empleado', '$2b$10$DefaulthashForDemo123456789012345678901234567890', 'Miguel Torres', 'empleado@ranchogrande.com', 3, 1, 1),
-('proveedor', '$2b$10$DefaulthashForDemo123456789012345678901234567890', 'Pedro Mora', 'pedro@carneelpaisa.com', 4, NULL, NULL),
-('domiciliario', '$2b$10$DefaulthashForDemo123456789012345678901234567890', 'Jhon Diaz', 'jhon@carneelpaisa.com', 5, NULL, NULL);
+('admin', '$2a$10$oeMFaVfquf/BWyFhkKmh.upF3lNucd/f8.jq4pajD5Sl10zCwwU.e', 'Super Administrador', 'admin@xupply.com', 1, NULL, NULL),
+('gerente', '$2a$10$oeMFaVfquf/BWyFhkKmh.upF3lNucd/f8.jq4pajD5Sl10zCwwU.e', 'Laura Vargas', 'gerente@ranchogrande.com', 2, 1, 1),
+('empleado', '$2a$10$oeMFaVfquf/BWyFhkKmh.upF3lNucd/f8.jq4pajD5Sl10zCwwU.e', 'Miguel Torres', 'empleado@ranchogrande.com', 3, 1, 1),
+('proveedor', '$2a$10$oeMFaVfquf/BWyFhkKmh.upF3lNucd/f8.jq4pajD5Sl10zCwwU.e', 'Pedro Mora', 'pedro@carneelpaisa.com', 4, NULL, NULL),
+('domiciliario', '$2a$10$oeMFaVfquf/BWyFhkKmh.upF3lNucd/f8.jq4pajD5Sl10zCwwU.e', 'Jhon Diaz', 'jhon@carneelpaisa.com', 5, NULL, NULL) ON CONFLICT (username) DO NOTHING;
 
 -- ============================================================
 -- VISTAS
@@ -635,7 +694,7 @@ SELECT
   (SELECT COUNT(*) FROM orders o WHERE o.restaurant_id = r.id AND DATE(o.created_at) = CURRENT_DATE) AS today_orders,
   (SELECT COALESCE(SUM(i.total), 0) FROM invoices i WHERE i.restaurant_id = r.id AND DATE(i.issued_at) = CURRENT_DATE) AS today_revenue,
   (SELECT COUNT(*) FROM inventory inv WHERE inv.restaurant_id = r.id AND inv.stock_status = 'critical') AS critical_stock_count,
-  (SELECT COUNT(*) FROM xuppliers s WHERE s.is_active = TRUE) AS active_xuppliers
+  (SELECT COUNT(*) FROM suppliers s WHERE s.is_active = TRUE) AS active_suppliers
 FROM restaurants r;
 
 CREATE OR REPLACE VIEW v_inventory_predictions AS

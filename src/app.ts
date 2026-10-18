@@ -17,7 +17,12 @@ import dashboardRouter from './routes/dashboard';
 import aiRouter from './routes/ai';
 import usersRouter from './routes/users';
 import radarRouter from './routes/radar';
+import purchaseOrdersRouter from './routes/purchaseOrders';
+import agentRouter from './routes/agent';
+import xupaiRouter from './routes/xupai';
 import adminRouter from './routes/admin';
+import { ensureServerInitialized } from './lib/migrations';
+import { query, resolveDatabaseUrl } from './config/db';
 import { notFound, errorHandler } from './middleware/error';
 
 export function createApp() {
@@ -30,14 +35,57 @@ export function createApp() {
   app.use(
     cors({
       origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
-        return cb(null, true);
+        // Permitir peticiones sin Origin (server-to-server, curl) y, en desarrollo,
+        // cuando no hay CLIENT_ORIGIN configurado. En producción se exige la lista blanca.
+        if (!origin || configuredOrigins.length === 0 || configuredOrigins.includes(origin)) {
+          return cb(null, true);
+        }
+        return cb(null, false);
       },
       credentials: true,
     })
   );
   app.use(express.json());
 
-  app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'xupply-api' }));
+  // === 1. RUTAS DE DIAGNÓSTICO Y HEALTHCHECK (RESPUESTA INMEDIATA) ===
+  const healthHandler = async (_req: express.Request, res: express.Response) => {
+    try {
+      const resolved = resolveDatabaseUrl();
+      if (process.env.VERCEL === '1' && !resolved.isConfigured) {
+        return res.status(200).json({
+          status: 'ok',
+          service: 'xupply-api',
+          db: 'missing_env',
+          message: 'DATABASE_URL (o POSTGRES_URL) no está configurada en Vercel Settings -> Environment Variables.',
+        });
+      }
+      const testRes = await query("SELECT to_regclass('public.users') as has_users");
+      return res.status(200).json({
+        status: 'ok',
+        service: 'xupply-api',
+        db: 'connected',
+        tables_ready: Boolean(testRes.rows[0]?.has_users),
+      });
+    } catch {
+      return res.status(200).json({
+        status: 'ok',
+        service: 'xupply-api',
+        db: 'error',
+      });
+    }
+  };
+  app.get('/health', healthHandler);
+  app.get('/api/health', healthHandler);
+
+  // === 2. AUTO-INICIALIZACION DE BD PARA RUTAS DE NEGOCIO ===
+  app.use(async (_req, _res, next) => {
+    try {
+      await ensureServerInitialized();
+    } catch {
+      // Error ya registrado en ensureServerInitialized
+    }
+    next();
+  });
 
   app.use('/api/auth', authRouter);
   app.use('/api/restaurants', restaurantsRouter);
@@ -54,6 +102,9 @@ export function createApp() {
   app.use('/api/ai', aiRouter);
   app.use('/api/users', usersRouter);
   app.use('/api/radar', radarRouter);
+  app.use('/api/purchase-orders', purchaseOrdersRouter);
+  app.use('/api/agent', agentRouter);
+  app.use('/api/xupai', xupaiRouter);
   app.use('/api/admin', adminRouter);
 
   // Endpoint de descarga directa del instalador APK para Android
@@ -93,3 +144,6 @@ export function createApp() {
   app.use(errorHandler);
   return app;
 }
+
+const defaultApp = createApp();
+export default defaultApp;

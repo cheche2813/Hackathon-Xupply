@@ -7,12 +7,24 @@ export function setIo(instance: SocketIOServer) {
 }
 
 export function registerSocket(socket: Socket) {
-  const { restaurantId, supplierId, orderId, deliveryId, userId } = socket.handshake.query;
+  const { restaurantId, supplierId, orderId, deliveryId, userId, role } = socket.handshake.query;
   if (typeof restaurantId === 'string') socket.join(`restaurant:${restaurantId}`);
   if (typeof supplierId === 'string') socket.join(`supplier:${supplierId}`);
   if (typeof orderId === 'string') socket.join(`order:${orderId}`);
   if (typeof deliveryId === 'string') socket.join(`delivery:${deliveryId}`);
   if (typeof userId === 'string') socket.join(`user:${userId}`);
+  if (typeof role === 'string') socket.join(`role:${role}`);
+  if (role === 'admin') socket.join('admins');
+
+  socket.on('client:identify', (data: any) => {
+    if (data?.role === 'admin') {
+      socket.join('admins');
+      socket.join('role:admin');
+    }
+    if (data?.userId) socket.join(`user:${data.userId}`);
+    if (data?.restaurantId) socket.join(`restaurant:${data.restaurantId}`);
+    if (data?.supplierId) socket.join(`supplier:${data.supplierId}`);
+  });
 
   // Permite al cliente unirse/salir de la sala de seguimiento de una entrega
   socket.on('delivery:join', (id: unknown) => {
@@ -21,6 +33,20 @@ export function registerSocket(socket: Socket) {
   socket.on('delivery:leave', (id: unknown) => {
     socket.leave(`delivery:${Number(id)}`);
   });
+
+  // Permite al repartidor actualizar su posición en vivo
+  socket.on('delivery:update_position', (data: { deliveryId: number; lat: number; lng: number; speed: number | null }) => {
+    if (data && data.deliveryId) {
+      // Retransmitimos la posición a todos los que estén suscritos a esta entrega (Restaurantes, Admins, etc.)
+      socket.to(`delivery:${data.deliveryId}`).emit('delivery:position', data);
+    }
+  });
+}
+
+export function emitAuditActivity(data: unknown) {
+  if (!io) return;
+  io.to('admins').emit('audit:new_entry', data);
+  io.to('admins').emit('user:activity', data);
 }
 
 /**
@@ -102,6 +128,11 @@ export function emitOrder(event: string, data: unknown) {
 export function emitToUser(event: string, userId: number, data: unknown) {
   if (!io) return;
   io.to(`user:${userId}`).emit(event, data);
+}
+
+export function emitToRole(role: string, event: string, data: unknown) {
+  if (!io) return;
+  io.to(`role:${role}`).emit(event, data);
 }
 
 export function emitInventoryAlert(restaurantId: number, data: unknown) {

@@ -1,117 +1,125 @@
-# Módulo Backend: Login & Carrito de Compras (Zupply)
+# Backend Xupply (Hackathon) — API REST + Tiempo Real
 
-Este paquete contiene la parte del código de backend encargada del **Inicio de Sesión (Login / Autenticación)** y el **Carrito de Compras / Procesamiento de Pedidos**, listo para desplegar e integrar en un repositorio mediante una rama de Git.
+Backend completo de la plataforma B2B: catálogo, pedidos, inventario (FEFO), facturación (DIAN/CUFE), logística con GPS en tiempo real, contabilidad, dashboard y agente de IA (XupAI).
+
+- **Stack**: Node.js + Express + TypeScript + PostgreSQL (`pg`) + Socket.IO
+- **Auto-inicialización**: al arrancar, el servidor verifica/crea el esquema (`src/config/schemaSql.ts`) y aplica migraciones (`src/lib/migrations.ts`). No hace falta ejecutar SQL a mano.
+- Sincronizado con el proyecto completo (`xupply-D` → `app/server`).
 
 ---
 
-## 📁 Estructura del Módulo
+## 📁 Estructura
 
 ```text
-backend-login-cart/
-├── README.md                 # Guía completa de uso, arquitectura y endpoints
-├── package.json              # Dependencias (Express, PostgreSQL, JWT, Bcrypt)
-├── tsconfig.json             # Configuración de TypeScript
-├── .env.example              # Ejemplo de variables de entorno
-├── schema.sql                # Script de creación de tablas en PostgreSQL
-└── src/
-    ├── server.ts             # Punto de entrada HTTP y arranque de DB
-    ├── app.ts                # Configuración de Express, CORS y middleware
-    ├── config/
-    │   └── db.ts             # Conexión a PostgreSQL (pg pool)
-    ├── middleware/
-    │   ├── auth.ts           # Middleware JWT y control de roles
-    │   └── error.ts          # Manejador global de errores Express
-    ├── routes/
-    │   ├── auth.ts           # Endpoints: Login, Registro, Me, Roles
-    │   ├── orders.ts         # Endpoints: Carrito checkout, Lista de pedidos, Estado
-    │   └── products.ts       # Endpoints: Catálogo para armar el Carrito
-    └── lib/
-        ├── realtime.ts       # Emisión de eventos en tiempo real
-        ├── email.ts          # Servicio de notificaciones por email
-        └── bucaramangaGeo.ts # Cálculo de coordenadas/geolocalización
+.
+├── src/
+│   ├── server.ts             # Punto de entrada HTTP + Socket.IO + arranque de BD
+│   ├── app.ts                # Express: CORS, healthcheck, rutas, APK, estáticos
+│   ├── index.ts              # Entrada de compatibilidad (Vercel)
+│   ├── config/
+│   │   ├── db.ts             # Pool PostgreSQL + resolución de DATABASE_URL
+│   │   └── schemaSql.ts      # Esquema completo embebido (auto-init)
+│   ├── middleware/
+│   │   ├── auth.ts           # JWT, roles, permisos, token_version
+│   │   ├── error.ts          # Manejo global de errores
+│   │   └── rateLimit.ts      # Limitador para login/registro
+│   ├── routes/               # Todos los módulos de la API (ver abajo)
+│   └── lib/                  # audit, email, geo/Bucaramanga, migrations, radar, realtime...
+├── scripts/
+│   ├── smoke.ts              # Pruebas de humo RBAC/admin
+│   ├── populate_mock_data.js # Datos mock
+│   └── README.md
+├── insert_vehicles.ts        # Siembra vehículos demo (GPS/logística)
+├── Xupply_postgresql.sql     # Esquema canónico (idempotente, mismo que auto-crea el server)
+├── multimedia_postgresql.sql # Módulo de media independiente
+└── schema.sql                # Esquema mínimo legado del módulo login/carrito
 ```
 
 ---
 
-## ⚡ Instalación y Ejecución Local
+## ⚡ Puesta en marcha
 
-1. **Instalar dependencias:**
+1. **Instalar dependencias**
    ```bash
-   cd backend-login-cart
    npm install
    ```
 
-2. **Configurar Variables de Entorno (`.env`):**
-   Copia `.env.example` a `.env` y define tu base de datos:
+2. **Variables de entorno**: copia `.env.example` a `.env` y configura como mínimo:
    ```env
    PORT=4000
    DATABASE_URL=postgres://usuario:password@localhost:5432/zupply
-   JWT_SECRET=tu_clave_secreta_jwt
+   JWT_SECRET=<secreto-largo-aleatorio>
    CLIENT_ORIGIN=http://localhost:5173
    ```
 
-3. **Base de Datos:**
-   Puedes ejecutar el script `schema.sql` en tu instancia de PostgreSQL o dejar que el servidor lo inicialice automáticamente al arrancar.
-
-4. **Iniciar en modo desarrollo:**
+3. **Base de datos**: crea la base en PostgreSQL (por ejemplo `zupply`) y arranca el servidor; el esquema se crea/actualiza solo. Si prefieres hacerlo manual:
    ```bash
-   npm run dev
+   psql -U postgres -d zupply -f Xupply_postgresql.sql
    ```
 
-5. **Compilar para producción:**
+4. **Modo desarrollo**
+   ```bash
+   npm run dev          # http://localhost:4000  (verifica con /health)
+   ```
+
+5. **Producción**
    ```bash
    npm run build
    npm start
    ```
 
----
+### Scripts útiles
 
-## 🔌 API Endpoints Principales
-
-### 🔑 Autenticación & Login (`/api/auth`)
-- **`POST /api/auth/login`**: Inicia sesión con `username` y `password`. Retorna el Token JWT y el usuario.
-- **`POST /api/auth/register`**: Registra un nuevo restaurante o proveedor con su rol correspondiente.
-- **`GET /api/auth/me`**: Retorna el perfil y rol del usuario actual autenticado (requiere Header `Authorization: Bearer <TOKEN>`).
-- **`GET /api/auth/roles`**: Retorna la lista de roles del sistema.
-
-### 🛒 Carrito de Compras & Órdenes (`/api/orders`)
-- **`POST /api/orders`**: **Checkout del Carrito de Compras.**
-  - Body de ejemplo:
-    ```json
-    {
-      "supplier_id": 1,
-      "branch_id": 1,
-      "items": [
-        { "product_id": 5, "quantity": 10 },
-        { "product_id": 8, "quantity": 2 }
-      ],
-      "notes": "Entregar en puerta trasera",
-      "delivery_address": "Calle 36 # 24-10, Bucaramanga"
-    }
-    ```
-- **`GET /api/orders`**: Lista los pedidos del restaurante o proveedor autenticado.
-- **`GET /api/orders/:id`**: Obtiene los detalles e ítems comprados en una órden.
-- **`PATCH /api/orders/:id/status`**: Transición de estado (`confirmado`, `despachado`, `entregado`, `cancelado`).
-
-### 📦 Productos (`/api/products`)
-- **`GET /api/products`**: Obtiene el catálogo de productos disponibles para armar el carrito de compras.
+| Comando | Descripción |
+| --- | --- |
+| `npm run dev` | Servidor en modo desarrollo (tsx watch) |
+| `npm run build` | Compila TypeScript a `dist/` |
+| `npm start` | Ejecuta el build (`dist/server.js`) |
+| `npm run typecheck` | Verificación de tipos (src + scripts) |
+| `npm run smoke` | Pruebas de humo del API (requiere server + BD) |
+| `npx tsx insert_vehicles.ts` | Siembra vehículos demo |
+| `node scripts/populate_mock_data.js` | Datos mock adicionales |
 
 ---
 
-## 🌿 Cómo subir este módulo a una rama en Git
+## 🔌 Endpoints principales
 
-Puedes subir este módulo en una rama dedicada siguiendo estos comandos desde la raíz del proyecto:
+| Prefijo | Módulo |
+| --- | --- |
+| `/api/auth` | Login, registro, perfil, roles, cambio de plan |
+| `/api/restaurants` | Restaurantes y sucursales |
+| `/api/suppliers` | Proveedores |
+| `/api/products` | Catálogo de productos |
+| `/api/categories` | Categorías |
+| `/api/orders` | Pedidos B2B (ciclo de vida completo) |
+| `/api/inventory` | Inventario / FEFO / movimientos |
+| `/api/invoices` | Facturación electrónica (DIAN/CUFE) |
+| `/api/reviews` | Reseñas de proveedores |
+| `/api/accounting` | Contabilidad y flujo de caja |
+| `/api/deliveries` | Entregas y seguimiento GPS |
+| `/api/dashboard` | KPIs ejecutivos |
+| `/api/ai` | Motor de predicciones |
+| `/api/users` | Usuarios |
+| `/api/radar` | Radar de alertas/ofertas |
+| `/api/purchase-orders` | Órdenes de compra |
+| `/api/agent` | Agente operativo |
+| `/api/xupai` | Asistente XupAI (DeepSeek) |
+| `/api/admin` | Panel de administración |
+| `/health` | Estado del servicio + base de datos |
 
-```bash
-# 1. Crear y cambiarse a la nueva rama
-git checkout -b feature/backend-login-cart
+Tiempo real: Socket.IO sobre el mismo servidor (salas por usuario, proveedor, pedido y entrega; GPS de entregas solo a partes autorizadas).
 
-# 2. Agregar la carpeta del módulo
-git add backend-login-cart
+---
 
-# 3. Guardar los cambios con un commit
-git commit -m "feat(backend): agregar modulo aislado de Login y Carrito de Compras"
+## 👥 Usuarios demo (contraseña: `demo1234`)
 
-# 4. Subir la rama a tu repositorio remoto (GitHub, GitLab, Bitbucket, etc.)
-git push -u origin feature/backend-login-cart
-```
+`admin`, `gerente`, `empleado`, `proveedor`, `domiciliario` — **cambiar contraseñas en producción**.
+
+---
+
+## 🔐 Notas
+
+- `JWT_SECRET` es obligatorio en producción; sin él el servidor no arranca (falla cerrado).
+- `CLIENT_ORIGIN` funciona como lista blanca de CORS (HTTP y Socket.IO).
+- El login no tiene atajos: solo `bcrypt.compare` contra el hash real.
+- Los cambios de rol/contraseña invalidan sesiones vía `token_version`.

@@ -1,6 +1,13 @@
 import { query } from '../config/db';
 
 /**
+ * Hash bcrypt real para la contraseña demo `demo1234`.
+ * Reemplaza el placeholder inválido `$2b$10$DefaulthashForDemo...` que
+ * permitía entrar sin validar el hash (backdoor) en bases de datos antiguas.
+ */
+const DEMO_PASSWORD_HASH = '$2a$10$oeMFaVfquf/BWyFhkKmh.upF3lNucd/f8.jq4pajD5Sl10zCwwU.e';
+
+/**
  * Migraciones idempotentes (patrón del repo: ALTER/CREATE ... IF NOT EXISTS).
  * Se ejecutan una vez al arrancar el servidor.
  */
@@ -96,16 +103,68 @@ export async function ensureRadarAndGpsSchema(): Promise<void> {
       );
       CREATE INDEX IF NOT EXISTS idx_radar_offers_status ON radar_offers(status, valid_until);
       CREATE INDEX IF NOT EXISTS idx_radar_offers_alert ON radar_offers(alert_id);
+
+      -- Purchase orders (drafts)
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'purchase_order_status') THEN
+          CREATE TYPE purchase_order_status AS ENUM ('borrador','enviada','confirmada','cancelada');
+        END IF;
+      END$$;
+      CREATE TABLE IF NOT EXISTS purchase_orders (
+        id SERIAL PRIMARY KEY,
+        order_code VARCHAR(30) NOT NULL UNIQUE,
+        restaurant_id INT NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+        supplier_id INT NOT NULL REFERENCES suppliers(id) ON DELETE CASCADE,
+        status purchase_order_status NOT NULL DEFAULT 'borrador',
+        subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
+        total DECIMAL(12,2) NOT NULL DEFAULT 0,
+        notes TEXT,
+        created_by INT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS purchase_order_items (
+        id SERIAL PRIMARY KEY,
+        purchase_order_id INT NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+        product_id INT REFERENCES products(id) ON DELETE SET NULL,
+        name VARCHAR(200) NOT NULL,
+        quantity DECIMAL(10,2) NOT NULL,
+        unit VARCHAR(30) NOT NULL,
+        unit_price DECIMAL(12,2) NOT NULL DEFAULT 0,
+        subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_po_restaurant ON purchase_orders(restaurant_id);
+      CREATE INDEX IF NOT EXISTS idx_po_supplier ON purchase_orders(supplier_id);
+      CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status);
+      CREATE INDEX IF NOT EXISTS idx_po_created ON purchase_orders(created_at);
+      CREATE INDEX IF NOT EXISTS idx_po_item_po ON purchase_order_items(purchase_order_id);
+      CREATE INDEX IF NOT EXISTS idx_po_item_product ON purchase_order_items(product_id);
+      CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+      CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id);
+      CREATE INDEX IF NOT EXISTS idx_products_supplier ON products(supplier_id);
+
       -- Permiso Analytics
       INSERT INTO permissions (name, description)
       VALUES ('analytics', 'Ver analitica y KPIs de la plataforma')
       ON CONFLICT (name) DO NOTHING;
+      INSERT INTO permissions (name, description)
+      VALUES ('compras:write', 'Crear y gestionar ordenes de compra')
+      ON CONFLICT (name) DO NOTHING;
 
+      -- El rol admin (role_id 1) recibe TODOS los permisos existentes.
+      -- Necesario porque requirePermission ya no tiene un bypass por rol.
       INSERT INTO role_permissions (role_id, permission_id)
       SELECT r.id, p.id FROM roles r, permissions p
-      WHERE r.name = 'admin' AND p.name = 'analytics'
+      WHERE r.name = 'admin'
       ON CONFLICT DO NOTHING;
 
+      -- Garantizar que usuarios proveedor tengan supplier_id asignado
+      UPDATE users SET supplier_id = 1 WHERE username IN ('proveedor', 'domiciliario') AND supplier_id IS NULL;
+      UPDATE users u
+      SET supplier_id = (SELECT s.id FROM suppliers s ORDER BY s.id ASC LIMIT 1)
+      WHERE u.role_id = 4 AND u.supplier_id IS NULL AND EXISTS (SELECT 1 FROM suppliers);
     `);
     console.log('[DB] Esquema Radar de Stock + GPS verificado.');
     
@@ -124,8 +183,24 @@ export async function ensureRadarAndGpsSchema(): Promise<void> {
   }
 }
 
-/** Cierra alertas y ofertas vencidas. Se ejecuta cada hora. */
-export async function expireRadarItems(): Promise<void> {
+/** Repara hashes de cuentas semilla antiguas que usaban un placeholder inválido (backdoor). */
+export async function repairLegacySeedPasswords(): Promise<void> {
+  try {
+    const res = await query(
+      `UPDATE users
+          SET password_hash = $1, token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP
+        WHERE password_hash LIKE '$2b$10$DefaulthashForDemo%'`,
+      [DEMO_PASSWORD_HASH]
+    );
+    if (res.rowCount) {
+      console.log(`[DB] Hashes semilla heredados reparados: ${res.rowCount}`);
+    }
+  } catch (err) {
+    console.error('[DB] Error reparando contraseñas semilla antiguas:', err);
+  }
+}
+
+/** Cierra alertas y ofertas vencidas. Se ejecuta cada hora. */export async function expireRadarItems(): Promise<void> {
   try {
     await query(
       `UPDATE radar_alerts SET status = 'expirada'
@@ -154,3 +229,24 @@ export async function dropLegacyPlatformViews(): Promise<void> {
     console.error('[DB] Error borrando vistas de KPIs:', err);
   }
 }
+
+let initPromise: Promise<void> | null = null;
+export async function ensureServerInitialized(): Promise<void> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      try {
+        const { initDatabase } = await import('../config/db');
+        await initDatabase();
+        await ensureRadarAndGpsSchema();
+        await repairLegacySeedPasswords();
+        await dropLegacyPlatformViews();
+        await expireRadarItems();
+      } catch (err) {
+        initPromise = null;
+        console.error('[DB] Error inicializando servidor y base de datos:', err);
+      }
+    })();
+  }
+  return initPromise;
+}
+
