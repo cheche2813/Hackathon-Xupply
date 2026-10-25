@@ -1,4 +1,31 @@
+# Secrets and local configuration
+.env
+.env.production
+.env.*.local
+*.local
+
+# Dependencies and generated output
 node_modules/
 dist/
-.env
+*.tsbuildinfo
+
+# Local databases and runtime files
+pgdata/
+pg.log
+*.pid
 *.log
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Android releases and keystores
+dist-apk/
+release-manual/
+*.jks
+*.apk
+
+# Docker local
+docker-compose.override.yml

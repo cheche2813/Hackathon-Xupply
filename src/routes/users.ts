@@ -7,6 +7,12 @@ import bcrypt from 'bcryptjs';
 const router = Router();
 router.use(authRequired);
 
+// Asegurar columnas de asignación de vehículo en usuarios
+query(`
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS vehicle_type VARCHAR(50);
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS vehicle_plate VARCHAR(50);
+`).catch(() => undefined);
+
 router.get('/', roleRequired('admin', 'gerente', 'proveedor_admin'), async (req, res, next) => {
   try {
     const user = req.user!;

@@ -49,7 +49,13 @@ Backend completo de la plataforma B2B: catálogo, pedidos, inventario (FEFO), fa
    PORT=4000
    DATABASE_URL=postgres://usuario:password@localhost:5432/xupply
    JWT_SECRET=<secreto-largo-aleatorio>
+   JWT_EXPIRES_IN=12h
    CLIENT_ORIGIN=http://localhost:5173
+   # Producción: nunca true (crea usuarios demo con contraseña conocida)
+   SEED_DEMO_DATA=false
+   # Solo el primer arranque con la base vacía
+   ADMIN_USERNAME=admin
+   ADMIN_PASSWORD=<contraseña-de-12+-caracteres>
    ```
 
 3. **Base de datos**: crea la base en PostgreSQL (por ejemplo `xupply`) y arranca el servidor; el esquema se crea/actualiza solo. Si prefieres hacerlo manual:
@@ -77,6 +83,7 @@ Backend completo de la plataforma B2B: catálogo, pedidos, inventario (FEFO), fa
 | `npm start` | Ejecuta el build (`dist/server.js`) |
 | `npm run typecheck` | Verificación de tipos (src + scripts) |
 | `npm run smoke` | Pruebas de humo del API (requiere server + BD) |
+| `npm run email:test -- correo@dominio.com` | Envía un correo real de prueba (ver `EMAIL-ENTERPRISE.md`) |
 | `npx tsx insert_vehicles.ts` | Siembra vehículos demo |
 | `node scripts/populate_mock_data.js` | Datos mock adicionales |
 
@@ -107,19 +114,73 @@ Backend completo de la plataforma B2B: catálogo, pedidos, inventario (FEFO), fa
 | `/api/admin` | Panel de administración |
 | `/health` | Estado del servicio + base de datos |
 
-Tiempo real: Socket.IO sobre el mismo servidor (salas por usuario, proveedor, pedido y entrega; GPS de entregas solo a partes autorizadas).
+Tiempo real: Socket.IO sobre el mismo servidor (salas por usuario, proveedor, pedido y entrega; GPS de entregas solo a partes autorizadas). Requiere un host persistente: **no funciona en Vercel serverless** (usa Render, VPS o Docker).
 
 ---
 
-## 👥 Usuarios demo (contraseña: `demo1234`)
+## 🔐 Seguridad
 
-`admin`, `gerente`, `empleado`, `proveedor`, `domiciliario` — **cambiar contraseñas en producción**.
+Este repo es la versión endurecida tras la auditoría (`SECURITY-AUDIT.md`):
+
+- Sin usuarios ni contraseñas demo. Los datos de demostración solo se crean con `SEED_DEMO_DATA=true`.
+- Administrador inicial vía `ADMIN_USERNAME` / `ADMIN_PASSWORD` (12+ caracteres).
+- En producción, las cuentas heredadas que aún usan el hash demo se **desactivan** al arrancar (`neutralizeDemoCredentials`).
+- `JWT_SECRET` obligatorio en producción; tokens de 12 h, `HS256`, identidad revalidada contra la BD en cada petición y handshake.
+- Socket.IO exige JWT y deriva las salas del token; no existe `client:identify`.
+- CORS fail-closed con lista blanca `CLIENT_ORIGIN`.
+- Cabeceras `helmet` (CSP, HSTS, `nosniff`, `X-Frame-Options`, `Referrer-Policy`) también en Vercel y Caddy.
+- Errores genéricos con `requestId` (sin stack traces al cliente).
+
+> Si heredaste una base de datos con usuarios demo, al desplegar esta versión y reiniciar se bloquean automáticamente. Revisa los logs `[SECURITY]`.
 
 ---
 
-## 🔐 Notas
+## ✉️ Correo transaccional
+
+`src/lib/email.ts` soporta tres proveedores con autodetección:
+
+| Prioridad | Proveedor | Variables |
+|---|---|---|
+| 1 | SMTP empresarial | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` |
+| 2 | Resend | `RESEND_API_KEY` |
+| 3 | EmailJS (legacy) | `EMAILJS_*` |
+
+```env
+MAIL_PROVIDER=smtp
+MAIL_FROM=notificaciones@tudominio.com
+MAIL_FROM_NAME=Xupply
+MAIL_REPLY_TO=soporte@tudominio.com
+MAIL_BCC=auditoria@tudominio.com
+APP_URL=https://tudominio.com
+```
+
+- Usa un **dominio corporativo** (nunca Gmail/Hotmail) y publica **SPF, DKIM y DMARC** para que el correo llegue a Recibidos.
+- Diagnóstico admin: `GET /api/admin/email/status` y `POST /api/admin/email/test` (solo al correo del admin autenticado).
+- Guía completa (Google Workspace, Microsoft 365, SES, Resend, DNS y diagnóstico): **`EMAIL-ENTERPRISE.md`**.
+
+---
+
+## 🚀 Despliegue
+
+| Plataforma | Archivo | Notas |
+|---|---|---|
+| Vercel | `vercel.json` | Solo API; sin Socket.IO. Define las variables en el panel. |
+| Render | `render.yaml` | Servicio + base de datos; `JWT_SECRET` autogenerado. |
+| Docker Compose + Caddy | `docker-compose.yml`, `Caddyfile` | TLS automático, hardening, WebSocket soportado. |
+
+```bash
+cp .env.production.example .env.production
+docker compose up -d --build
+```
+
+Pasos, variables y checklist completos: **`MIGRACION-BACKEND.md`**.
+
+---
+
+## 📌 Notas
 
 - `JWT_SECRET` es obligatorio en producción; sin él el servidor no arranca (falla cerrado).
 - `CLIENT_ORIGIN` funciona como lista blanca de CORS (HTTP y Socket.IO).
 - El login no tiene atajos: solo `bcrypt.compare` contra el hash real.
 - Los cambios de rol/contraseña invalidan sesiones vía `token_version`.
+- No subas `.env`, `.env.production` ni claves al repositorio.

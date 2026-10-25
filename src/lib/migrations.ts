@@ -1,13 +1,6 @@
 import { query } from '../config/db';
 
 /**
- * Hash bcrypt real para la contraseña demo `demo1234`.
- * Reemplaza el placeholder inválido `$2b$10$DefaulthashForDemo...` que
- * permitía entrar sin validar el hash (backdoor) en bases de datos antiguas.
- */
-const DEMO_PASSWORD_HASH = '$2a$10$oeMFaVfquf/BWyFhkKmh.upF3lNucd/f8.jq4pajD5Sl10zCwwU.e';
-
-/**
  * Migraciones idempotentes (patrón del repo: ALTER/CREATE ... IF NOT EXISTS).
  * Se ejecutan una vez al arrancar el servidor.
  */
@@ -37,16 +30,6 @@ export async function ensureRadarAndGpsSchema(): Promise<void> {
       -- Columnas que el código de entregas usa pero el esquema base no incluía
       ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS confirmation_code VARCHAR(10);
       ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS actual_delivery_time TIMESTAMP NULL;
-
-      -- Asignación de vehículo por usuario (antes: DDL en el top-level de routes/users.ts,
-      -- que se ejecutaba ANTES de crear el esquema y fallaba en silencio en bases nuevas)
-      ALTER TABLE users ADD COLUMN IF NOT EXISTS vehicle_type VARCHAR(50);
-      ALTER TABLE users ADD COLUMN IF NOT EXISTS vehicle_plate VARCHAR(50);
-
-      -- Vehículo con conductor asignado y proveedor opcional (antes: DDL en el top-level
-      -- de routes/deliveries.ts, mismo problema de orden en bases nuevas)
-      ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS driver_id INT REFERENCES users(id) ON DELETE SET NULL;
-      ALTER TABLE vehicles ALTER COLUMN supplier_id DROP NOT NULL;
 
       -- Última posición del domiciliario (clave por usuario, no por vehículo)
       CREATE TABLE IF NOT EXISTS driver_locations (
@@ -170,53 +153,13 @@ export async function ensureRadarAndGpsSchema(): Promise<void> {
       WHERE r.name = 'admin'
       ON CONFLICT DO NOTHING;
 
-      -- Garantizar que usuarios proveedor tengan supplier_id asignado
-      UPDATE users SET supplier_id = 1 WHERE username IN ('proveedor', 'domiciliario') AND supplier_id IS NULL;
-      UPDATE users u
-      SET supplier_id = (SELECT s.id FROM suppliers s ORDER BY s.id ASC LIMIT 1)
-      WHERE u.role_id = 4 AND u.supplier_id IS NULL AND EXISTS (SELECT 1 FROM suppliers);
+      -- Vehículos: conductor asignado y flota compartida opcional
+      ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS driver_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE vehicles ALTER COLUMN supplier_id DROP NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_vehicles_supplier ON vehicles(supplier_id);
+      CREATE INDEX IF NOT EXISTS idx_deliveries_driver ON deliveries(driver_id);
     `);
     console.log('[DB] Esquema Radar de Stock + GPS verificado.');
-
-    // Semilla idempotente de direcciones/coordenadas de Bucaramanga.
-    // Antes vivía en el top-level de routes/deliveries.ts (mismo problema de orden).
-    try {
-      await query(`
-        UPDATE deliveries
-        SET dest_lat = 7.1168, dest_lng = -73.1095,
-            delivery_address = 'Carrera 35 #48-22, Cabecera del Llano, Bucaramanga'
-        WHERE id % 4 = 1;
-
-        UPDATE deliveries
-        SET dest_lat = 7.0665, dest_lng = -73.1030,
-            delivery_address = 'Calle 30 #26-10, Parque Caracolí / Cañaveral, Floridablanca'
-        WHERE id % 4 = 2;
-
-        UPDATE deliveries
-        SET dest_lat = 7.0845, dest_lng = -73.1175,
-            delivery_address = 'Calle 105 #24-32, Provenza, Bucaramanga'
-        WHERE id % 4 = 3;
-
-        UPDATE deliveries
-        SET dest_lat = 7.0984, dest_lng = -73.1090,
-            delivery_address = 'Transversal 93 #34-99, El Tejar / C.C. Cacique, Bucaramanga'
-        WHERE id % 4 = 0;
-
-        UPDATE vehicles
-        SET current_lat = 7.1320, current_lng = -73.1650
-        WHERE id % 3 = 1;
-
-        UPDATE vehicles
-        SET current_lat = 7.0850, current_lng = -73.1680
-        WHERE id % 3 = 2;
-
-        UPDATE vehicles
-        SET current_lat = 7.1235, current_lng = -73.1285
-        WHERE id % 3 = 0;
-      `);
-    } catch (e) {
-      console.warn('[DB] Advertencia sembrando coordenadas de Bucaramanga:', e);
-    }
     
     // Indice unico parcial contabilidad
     try {
@@ -228,25 +171,18 @@ export async function ensureRadarAndGpsSchema(): Promise<void> {
     } catch (e) {
       console.warn('[DB] Advertencia creando índice uq_accounting_invoice_ingreso:', e);
     }
-  } catch (err) {
-    console.error('[DB] Error aplicando esquema Radar/GPS:', err);
-  }
-}
-
-/** Repara hashes de cuentas semilla antiguas que usaban un placeholder inválido (backdoor). */
-export async function repairLegacySeedPasswords(): Promise<void> {
-  try {
-    const res = await query(
-      `UPDATE users
-          SET password_hash = $1, token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP
-        WHERE password_hash LIKE '$2b$10$DefaulthashForDemo%'`,
-      [DEMO_PASSWORD_HASH]
-    );
-    if (res.rowCount) {
-      console.log(`[DB] Hashes semilla heredados reparados: ${res.rowCount}`);
+    // Índice único de reseñas: una por usuario y proveedor (idempotente).
+    try {
+      await query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_review_supplier_user
+        ON "Reseña" (supplier_id, created_by)
+        WHERE created_by IS NOT NULL;
+      `);
+    } catch (e) {
+      console.warn('[DB] No se pudo crear uq_review_supplier_user (¿reseñas duplicadas existentes?):', e);
     }
   } catch (err) {
-    console.error('[DB] Error reparando contraseñas semilla antiguas:', err);
+    console.error('[DB] Error aplicando esquema Radar/GPS:', err);
   }
 }
 
@@ -285,10 +221,10 @@ export async function ensureServerInitialized(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
       try {
-        const { initDatabase } = await import('../config/db');
+        const { initDatabase, neutralizeDemoCredentials } = await import('../config/db');
         await initDatabase();
         await ensureRadarAndGpsSchema();
-        await repairLegacySeedPasswords();
+        await neutralizeDemoCredentials();
         await dropLegacyPlatformViews();
         await expireRadarItems();
       } catch (err) {

@@ -1,0 +1,15 @@
+# Dependencias y artefactos
+node_modules
+dist
+.git
+.github
+*.log
+
+# Secretos
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Base de datos local
+pgdata

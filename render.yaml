@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: xupply-backend
+    runtime: node
+    buildCommand: npm ci --no-audit --no-fund && npm run build
+    startCommand: node dist/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Dominio(s) del frontend separados por coma. Sin lista, en producción no
+      # se acepta ningún origen cruzado (fail-closed).
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 12h
+      - key: SEED_DEMO_DATA
+        value: "false"
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Correo transaccional (ver EMAIL-ENTERPRISE.md)
+      - key: MAIL_PROVIDER
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: MAIL_REPLY_TO
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: xupply-db
+          property: connectionString
+
+databases:
+  - name: xupply-db
+    databaseName: xupply
+    user: xupply
+    plan: free
