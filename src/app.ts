@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import path from 'path';
 import fs from 'fs';
 import authRouter from './routes/auth';
@@ -21,43 +22,92 @@ import purchaseOrdersRouter from './routes/purchaseOrders';
 import agentRouter from './routes/agent';
 import xupaiRouter from './routes/xupai';
 import adminRouter from './routes/admin';
+import verificationRouter from './routes/verification';
 import { ensureServerInitialized } from './lib/migrations';
 import { query, resolveDatabaseUrl } from './config/db';
 import { notFound, errorHandler } from './middleware/error';
 
 export function createApp() {
   const app = express();
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL === '1';
   const configuredOrigins = (process.env.CLIENT_ORIGIN ?? '')
     .split(',')
     .map((origin) => origin.trim())
-    .filter(Boolean);
+    .filter((origin) => Boolean(origin) && origin !== '*');
+
+  // Detrás de Vercel / Render / Caddy siempre hay un proxy: sin esto `req.ip`
+  // devuelve la IP del proxy y el rate-limit (y la auditoría) quedan inútiles.
+  app.set('trust proxy', 1);
+  app.disable('x-powered-by');
+
+  // Cabeceras de seguridad. La CSP se define también aquí para despliegues
+  // que no pasan por un borde con cabeceras propias (Render, VPS, Docker sin
+  // Caddy). En Vercel/Caddy se refuerza en el borde.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: {
+          defaultSrc: ["'self'"],
+          baseUri: ["'self'"],
+          objectSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+          // Visor de documentos del back office: PDFs servidos como blob.
+          frameSrc: ["'self'", 'blob:'],
+          formAction: ["'self'"],
+          scriptSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+          fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+          connectSrc: ["'self'", 'https:', 'wss:'],
+          manifestSrc: ["'self'"],
+          workerSrc: ["'self'", 'blob:'],
+        },
+      },
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      frameguard: { action: 'deny' },
+    })
+  );
 
   app.use(
     cors({
       origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
-        // Permitir peticiones sin Origin (server-to-server, curl) y, en desarrollo,
-        // cuando no hay CLIENT_ORIGIN configurado. En producción se exige la lista blanca.
-        if (!origin || configuredOrigins.length === 0 || configuredOrigins.includes(origin)) {
-          return cb(null, true);
-        }
-        return cb(null, false);
+        // Peticiones sin Origin (server-to-server, curl, apps nativas) se permiten.
+        if (!origin) return cb(null, true);
+        if (configuredOrigins.includes(origin)) return cb(null, true);
+        // WebView de Capacitor (APK): el origen es https://localhost. No concede
+        // acceso por sí solo; toda petición sigue exigiendo el Bearer token.
+        const nativeOrigins = ['https://localhost', 'capacitor://localhost', 'http://localhost'];
+        if (nativeOrigins.includes(origin)) return cb(null, true);
+        // Fail-closed: sin lista blanca configurada, en producción NO se permite
+        // ningún origen cruzado (antes se permitían todos).
+        return cb(null, !isProduction);
       },
       credentials: true,
     })
   );
-  app.use(express.json());
+  // Límite explícito: evita peticiones gigantes que agoten memoria/CPU.
+  // La carga de documentos de verificación usa su propio parser (6 MB) más
+  // abajo, porque un PDF en base64 supera el límite general de 1 MB.
+  const jsonParser = express.json({ limit: '1mb' });
+  app.use((req, res, next) => {
+    if (
+      req.method === 'POST' &&
+      /^\/api\/verification\/public\/[a-f0-9]{64}\/documents$/i.test(req.path)
+    ) {
+      return next();
+    }
+    return jsonParser(req, res, next);
+  });
 
   // === 1. RUTAS DE DIAGNÓSTICO Y HEALTHCHECK (RESPUESTA INMEDIATA) ===
   const healthHandler = async (_req: express.Request, res: express.Response) => {
     try {
       const resolved = resolveDatabaseUrl();
       if (process.env.VERCEL === '1' && !resolved.isConfigured) {
-        return res.status(200).json({
-          status: 'ok',
-          service: 'xupply-api',
-          db: 'missing_env',
-          message: 'DATABASE_URL (o POSTGRES_URL) no está configurada en Vercel Settings -> Environment Variables.',
-        });
+        // Mensaje genérico: no revelar nombres de variables ni detalles de infra.
+        return res.status(503).json({ status: 'degraded', service: 'xupply-api' });
       }
       const testRes = await query("SELECT to_regclass('public.users') as has_users");
       return res.status(200).json({
@@ -67,11 +117,7 @@ export function createApp() {
         tables_ready: Boolean(testRes.rows[0]?.has_users),
       });
     } catch {
-      return res.status(200).json({
-        status: 'ok',
-        service: 'xupply-api',
-        db: 'error',
-      });
+      return res.status(503).json({ status: 'degraded', service: 'xupply-api' });
     }
   };
   app.get('/health', healthHandler);
@@ -88,6 +134,7 @@ export function createApp() {
   });
 
   app.use('/api/auth', authRouter);
+  app.use('/api/verification', verificationRouter);
   app.use('/api/restaurants', restaurantsRouter);
   app.use('/api/suppliers', suppliersRouter);
   app.use('/api/products', productsRouter);

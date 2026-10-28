@@ -1,13 +1,6 @@
 import { query } from '../config/db';
 
 /**
- * Hash bcrypt real para la contraseña demo `demo1234`.
- * Reemplaza el placeholder inválido `$2b$10$DefaulthashForDemo...` que
- * permitía entrar sin validar el hash (backdoor) en bases de datos antiguas.
- */
-const DEMO_PASSWORD_HASH = '$2a$10$oeMFaVfquf/BWyFhkKmh.upF3lNucd/f8.jq4pajD5Sl10zCwwU.e';
-
-/**
  * Migraciones idempotentes (patrón del repo: ALTER/CREATE ... IF NOT EXISTS).
  * Se ejecutan una vez al arrancar el servidor.
  */
@@ -37,16 +30,6 @@ export async function ensureRadarAndGpsSchema(): Promise<void> {
       -- Columnas que el código de entregas usa pero el esquema base no incluía
       ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS confirmation_code VARCHAR(10);
       ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS actual_delivery_time TIMESTAMP NULL;
-
-      -- Asignación de vehículo por usuario (antes: DDL en el top-level de routes/users.ts,
-      -- que se ejecutaba ANTES de crear el esquema y fallaba en silencio en bases nuevas)
-      ALTER TABLE users ADD COLUMN IF NOT EXISTS vehicle_type VARCHAR(50);
-      ALTER TABLE users ADD COLUMN IF NOT EXISTS vehicle_plate VARCHAR(50);
-
-      -- Vehículo con conductor asignado y proveedor opcional (antes: DDL en el top-level
-      -- de routes/deliveries.ts, mismo problema de orden en bases nuevas)
-      ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS driver_id INT REFERENCES users(id) ON DELETE SET NULL;
-      ALTER TABLE vehicles ALTER COLUMN supplier_id DROP NOT NULL;
 
       -- Última posición del domiciliario (clave por usuario, no por vehículo)
       CREATE TABLE IF NOT EXISTS driver_locations (
@@ -170,53 +153,13 @@ export async function ensureRadarAndGpsSchema(): Promise<void> {
       WHERE r.name = 'admin'
       ON CONFLICT DO NOTHING;
 
-      -- Garantizar que usuarios proveedor tengan supplier_id asignado
-      UPDATE users SET supplier_id = 1 WHERE username IN ('proveedor', 'domiciliario') AND supplier_id IS NULL;
-      UPDATE users u
-      SET supplier_id = (SELECT s.id FROM suppliers s ORDER BY s.id ASC LIMIT 1)
-      WHERE u.role_id = 4 AND u.supplier_id IS NULL AND EXISTS (SELECT 1 FROM suppliers);
+      -- Vehículos: conductor asignado y flota compartida opcional
+      ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS driver_id INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE vehicles ALTER COLUMN supplier_id DROP NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_vehicles_supplier ON vehicles(supplier_id);
+      CREATE INDEX IF NOT EXISTS idx_deliveries_driver ON deliveries(driver_id);
     `);
     console.log('[DB] Esquema Radar de Stock + GPS verificado.');
-
-    // Semilla idempotente de direcciones/coordenadas de Bucaramanga.
-    // Antes vivía en el top-level de routes/deliveries.ts (mismo problema de orden).
-    try {
-      await query(`
-        UPDATE deliveries
-        SET dest_lat = 7.1168, dest_lng = -73.1095,
-            delivery_address = 'Carrera 35 #48-22, Cabecera del Llano, Bucaramanga'
-        WHERE id % 4 = 1;
-
-        UPDATE deliveries
-        SET dest_lat = 7.0665, dest_lng = -73.1030,
-            delivery_address = 'Calle 30 #26-10, Parque Caracolí / Cañaveral, Floridablanca'
-        WHERE id % 4 = 2;
-
-        UPDATE deliveries
-        SET dest_lat = 7.0845, dest_lng = -73.1175,
-            delivery_address = 'Calle 105 #24-32, Provenza, Bucaramanga'
-        WHERE id % 4 = 3;
-
-        UPDATE deliveries
-        SET dest_lat = 7.0984, dest_lng = -73.1090,
-            delivery_address = 'Transversal 93 #34-99, El Tejar / C.C. Cacique, Bucaramanga'
-        WHERE id % 4 = 0;
-
-        UPDATE vehicles
-        SET current_lat = 7.1320, current_lng = -73.1650
-        WHERE id % 3 = 1;
-
-        UPDATE vehicles
-        SET current_lat = 7.0850, current_lng = -73.1680
-        WHERE id % 3 = 2;
-
-        UPDATE vehicles
-        SET current_lat = 7.1235, current_lng = -73.1285
-        WHERE id % 3 = 0;
-      `);
-    } catch (e) {
-      console.warn('[DB] Advertencia sembrando coordenadas de Bucaramanga:', e);
-    }
     
     // Indice unico parcial contabilidad
     try {
@@ -228,25 +171,113 @@ export async function ensureRadarAndGpsSchema(): Promise<void> {
     } catch (e) {
       console.warn('[DB] Advertencia creando índice uq_accounting_invoice_ingreso:', e);
     }
+    // Índice único de reseñas: una por usuario y proveedor (idempotente).
+    try {
+      await query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_review_supplier_user
+        ON "Reseña" (supplier_id, created_by)
+        WHERE created_by IS NOT NULL;
+      `);
+    } catch (e) {
+      console.warn('[DB] No se pudo crear uq_review_supplier_user (¿reseñas duplicadas existentes?):', e);
+    }
   } catch (err) {
     console.error('[DB] Error aplicando esquema Radar/GPS:', err);
   }
 }
 
-/** Repara hashes de cuentas semilla antiguas que usaban un placeholder inválido (backdoor). */
-export async function repairLegacySeedPasswords(): Promise<void> {
+/**
+ * Verificación de cuentas empresariales (KYC/KYB).
+ *
+ * Las cuentas existentes quedan como `verificado` (no se bloquea a nadie que
+ * ya operaba); a partir de esta migración, los registros nuevos se insertan
+ * explícitamente como `pendiente` desde /api/auth/register.
+ */
+export async function ensureVerificationSchema(): Promise<void> {
   try {
-    const res = await query(
-      `UPDATE users
-          SET password_hash = $1, token_version = token_version + 1, updated_at = CURRENT_TIMESTAMP
-        WHERE password_hash LIKE '$2b$10$DefaulthashForDemo%'`,
-      [DEMO_PASSWORD_HASH]
-    );
-    if (res.rowCount) {
-      console.log(`[DB] Hashes semilla heredados reparados: ${res.rowCount}`);
-    }
+    await query(`
+      ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS verification_status VARCHAR(20) NOT NULL DEFAULT 'verificado';
+      ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS verification_reason TEXT;
+      ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS verification_token VARCHAR(64);
+      ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP;
+      ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS verified_by INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP;
+      ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS legal_rep_name VARCHAR(200);
+      ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS legal_rep_document VARCHAR(30);
+
+      ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS verification_status VARCHAR(20) NOT NULL DEFAULT 'verificado';
+      ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS verification_reason TEXT;
+      ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS verification_token VARCHAR(64);
+      ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP;
+      ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS verified_by INT REFERENCES users(id) ON DELETE SET NULL;
+      ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP;
+      ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS legal_rep_name VARCHAR(200);
+      ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS legal_rep_document VARCHAR(30);
+
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_restaurants_verification_token
+        ON restaurants(verification_token) WHERE verification_token IS NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_suppliers_verification_token
+        ON suppliers(verification_token) WHERE verification_token IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_restaurants_verification_status ON restaurants(verification_status);
+      CREATE INDEX IF NOT EXISTS idx_suppliers_verification_status ON suppliers(verification_status);
+
+      CREATE TABLE IF NOT EXISTS verification_documents (
+        id SERIAL PRIMARY KEY,
+        entity_type VARCHAR(20) NOT NULL,
+        entity_id INT NOT NULL,
+        doc_type VARCHAR(30) NOT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        mime_type VARCHAR(100) NOT NULL,
+        size_bytes INT NOT NULL,
+        file_data BYTEA NOT NULL,
+        uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (entity_type, entity_id, doc_type)
+      );
+
+      CREATE TABLE IF NOT EXISTS verification_events (
+        id BIGSERIAL PRIMARY KEY,
+        entity_type VARCHAR(20) NOT NULL,
+        entity_id INT NOT NULL,
+        action VARCHAR(30) NOT NULL,
+        status_from VARCHAR(20),
+        status_to VARCHAR(20),
+        reason TEXT,
+        actor_id INT REFERENCES users(id) ON DELETE SET NULL,
+        actor_name VARCHAR(200),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_verification_docs_entity
+        ON verification_documents(entity_type, entity_id);
+      CREATE INDEX IF NOT EXISTS idx_verification_events_entity
+        ON verification_events(entity_type, entity_id, created_at);
+    `);
+
+    // Rol de back office y permisos del módulo.
+    await query(`
+      INSERT INTO roles (name, display_name, description) VALUES
+        ('verificador', 'Verificador', 'Back office: aprueba, rechaza y solicita correcciones de cuentas')
+      ON CONFLICT (name) DO NOTHING;
+
+      INSERT INTO permissions (name, description) VALUES
+        ('verificacion', 'Ver solicitudes de verificación de cuentas'),
+        ('verificacion:write', 'Aprobar, rechazar o solicitar correcciones')
+      ON CONFLICT (name) DO NOTHING;
+
+      INSERT INTO role_permissions (role_id, permission_id)
+      SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
+       WHERE r.name = 'verificador' AND p.name IN ('verificacion', 'verificacion:write')
+      ON CONFLICT DO NOTHING;
+
+      INSERT INTO role_permissions (role_id, permission_id)
+      SELECT r.id, p.id FROM roles r CROSS JOIN permissions p
+       WHERE r.name = 'admin' AND p.name LIKE 'verificacion%'
+      ON CONFLICT DO NOTHING;
+    `);
+
+    console.log('[DB] Esquema de verificación de cuentas listo.');
   } catch (err) {
-    console.error('[DB] Error reparando contraseñas semilla antiguas:', err);
+    console.error('[DB] Error aplicando esquema de verificación:', err);
   }
 }
 
@@ -285,10 +316,11 @@ export async function ensureServerInitialized(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
       try {
-        const { initDatabase } = await import('../config/db');
+        const { initDatabase, neutralizeDemoCredentials } = await import('../config/db');
         await initDatabase();
         await ensureRadarAndGpsSchema();
-        await repairLegacySeedPasswords();
+        await ensureVerificationSchema();
+        await neutralizeDemoCredentials();
         await dropLegacyPlatformViews();
         await expireRadarItems();
       } catch (err) {

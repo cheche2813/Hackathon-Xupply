@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { query } from '../config/db';
+import { timingSafeEqual } from 'crypto';
+import { pool, query } from '../config/db';
 import { authRequired, roleRequired } from '../middleware/auth';
 import { emitOrder, emitToUser, emitDeliveryPosition, emitDeliveryStatus } from '../lib/realtime';
 import { resolveBucaramangaCoords, BUCARAMANGA_DESTINATIONS, BUCARAMANGA_DISPATCH_HUBS } from '../lib/bucaramangaGeo';
@@ -17,13 +18,15 @@ function deliverySelect() {
                  v.current_lat AS vehicle_lat, v.current_lng AS vehicle_lng,
                  v.last_location_update, v.imei, v.gps_validated, v.gps_last_seen,
                  u.name AS driver_name, u.phone AS driver_phone,
+                 cu.name AS created_by_name, cu.phone AS created_by_phone,
                  s.name AS supplier_name, s.phone AS supplier_phone
           FROM deliveries d
           JOIN orders o ON o.id = d.order_id
           JOIN restaurants r ON r.id = d.restaurant_id
           JOIN suppliers s ON s.id = o.supplier_id
           LEFT JOIN vehicles v ON v.id = d.vehicle_id
-          LEFT JOIN users u ON u.id = d.driver_id`;
+          LEFT JOIN users u ON u.id = d.driver_id
+          LEFT JOIN users cu ON cu.id = o.created_by`;
 }
 
 /** Restringe una entrega al inquilino del usuario (proveedor, restaurante o domiciliario). */
@@ -43,6 +46,43 @@ function deliveryAccessWhere(user: {
     return { clause: ` AND d.restaurant_id = $${startIndex}`, params: [user.restaurant_id] as unknown[] };
   }
   return { clause: '', params: [] as unknown[] };
+}
+
+type DeliveryUser = {
+  role: string;
+  id: number;
+  supplier_id: number | null;
+  restaurant_id: number | null;
+};
+
+type DeliveryRow = Record<string, any>;
+
+/**
+ * El código de confirmación es una llave de doble control: lo lleva el
+ * domiciliario y lo valida el restaurante al recibir. Por eso NO debe
+ * devolverse a los usuarios del restaurante (podrían auto-confirmar sin que
+ * el conductor esté presente), ni a proveedores de otro inquilino.
+ */
+function canSeeConfirmationCode(user: DeliveryUser, row: DeliveryRow): boolean {
+  if (user.role === 'admin') return true;
+  if (
+    user.role === 'proveedor_admin' &&
+    user.supplier_id &&
+    Number(row.order_supplier_id) === Number(user.supplier_id)
+  ) {
+    return true;
+  }
+  if (user.role === 'domiciliario' && Number(row.driver_id) === Number(user.id)) {
+    return true;
+  }
+  return false;
+}
+
+/** Quita el código de confirmación de la respuesta para quien no debe verlo. */
+function redactDelivery<T extends DeliveryRow>(row: T, user: DeliveryUser): T {
+  if (!row || canSeeConfirmationCode(user, row)) return row;
+  const { confirmation_code, ...rest } = row;
+  return { ...rest, has_security_code: Boolean(confirmation_code) } as unknown as T;
 }
 
 router.get('/', async (req, res, next) => {
@@ -66,7 +106,7 @@ router.get('/', async (req, res, next) => {
     }
     sql += ' ORDER BY d.created_at DESC LIMIT 100';
     const result = await query(sql, params);
-    res.json(result.rows);
+    res.json(result.rows.map((row) => redactDelivery(row, user)));
   } catch (err) {
     next(err);
   }
@@ -81,7 +121,7 @@ router.get('/my-deliveries', roleRequired('domiciliario'), async (req, res, next
        ORDER BY d.created_at DESC LIMIT 50`,
       [user.id]
     );
-    res.json(result.rows);
+    res.json(result.rows.map((row) => redactDelivery(row, user)));
   } catch (err) {
     next(err);
   }
@@ -131,7 +171,7 @@ router.get('/live', async (req, res, next) => {
         }
       }
       rows.push({
-        ...r,
+        ...redactDelivery(r, user),
         position: lat !== null && lng !== null ? { lat, lng, recorded_at: updatedAt } : null,
         eta_min:
           lat !== null && lng !== null
@@ -145,19 +185,31 @@ router.get('/live', async (req, res, next) => {
   }
 });
 
+// Las columnas de asignación de vehículos y las coordenadas reales se
+// gestionan en lib/migrations.ts. No se mutan datos de demo en cada arranque.
+
 router.get('/vehicles', roleRequired('proveedor_admin', 'admin', 'gerente'), async (req, res, next) => {
   try {
     const user = req.user!;
+    const safeColumns = `v.id, v.supplier_id, v.name, v.plate, v.type, v.status, v.driver_id,
+                         v.current_lat, v.current_lng, v.last_location_update,
+                         v.gps_validated, v.gps_last_seen, v.is_active, v.created_at, v.updated_at`;
+    const adminColumns = user.role === 'admin' || user.role === 'proveedor_admin' ? ', v.imei' : '';
     let sql = `
-      SELECT v.*, u.name AS driver_name, u.phone AS driver_phone, u.username AS driver_username
+      SELECT ${safeColumns}${adminColumns}, u.name AS driver_name, u.phone AS driver_phone, u.username AS driver_username
       FROM vehicles v
       LEFT JOIN users u ON u.id = v.driver_id
       WHERE v.is_active = TRUE
     `;
     const params: unknown[] = [];
-    if (user.role === 'proveedor_admin' && user.supplier_id) {
+    if (user.role === 'proveedor_admin') {
+      if (!user.supplier_id) return res.status(403).json({ error: 'El usuario proveedor no tiene un proveedor asociado' });
       params.push(user.supplier_id);
-      sql += ` AND (v.supplier_id = $1 OR v.supplier_id IS NULL)`;
+      sql += ` AND v.supplier_id = $${params.length}`;
+    } else if (user.role === 'gerente') {
+      // El restaurante solo puede ver la flota de proveedores con los que opera.
+      params.push(user.restaurant_id);
+      sql += ` AND v.supplier_id IN (SELECT DISTINCT o.supplier_id FROM orders o WHERE o.restaurant_id = $${params.length})`;
     }
     sql += ' ORDER BY v.name';
     const result = await query(sql, params);
@@ -167,14 +219,26 @@ router.get('/vehicles', roleRequired('proveedor_admin', 'admin', 'gerente'), asy
   }
 });
 
-router.get('/drivers', roleRequired('proveedor_admin', 'admin', 'gerente'), async (_req, res, next) => {
+router.get('/drivers', roleRequired('proveedor_admin', 'admin', 'gerente'), async (req, res, next) => {
   try {
+    const user = req.user!;
+    const params: unknown[] = [];
+    let supplierFilter = '';
+    if (user.role === 'proveedor_admin') {
+      if (!user.supplier_id) {
+        return res.status(403).json({ error: 'El usuario proveedor no tiene un proveedor asociado' });
+      }
+      params.push(user.supplier_id);
+      supplierFilter = ` AND u.supplier_id = $${params.length}`;
+    }
     const result = await query(
       `SELECT u.id, u.name, u.username, u.phone, u.email, r.name AS role_name, r.display_name AS role_label
        FROM users u
        JOIN roles r ON r.id = u.role_id
        WHERE u.is_active = TRUE
-       ORDER BY (r.name = 'domiciliario') DESC, u.name ASC`
+         AND r.name = 'domiciliario'${supplierFilter}
+       ORDER BY u.name ASC`,
+      params
     );
     res.json(result.rows);
   } catch (err) {
@@ -191,7 +255,7 @@ router.get('/:id', async (req, res, next) => {
     const delivery = result.rows[0];
     const items = await query('SELECT * FROM delivery_items WHERE delivery_id = $1', [req.params.id]);
     const orderItems = await query('SELECT * FROM order_items WHERE order_id = $1', [delivery.order_id]);
-    res.json({ ...delivery, items: items.rows, order_items: orderItems.rows });
+    res.json({ ...redactDelivery(delivery, user), items: items.rows, order_items: orderItems.rows });
   } catch (err) {
     next(err);
   }
@@ -212,6 +276,36 @@ router.post('/', roleRequired('proveedor_admin', 'admin', 'gerente'), async (req
     }
     const order = await query(orderSql, orderParams);
     if (!order.rowCount) return res.status(404).json({ error: 'Pedido no encontrado o no autorizado' });
+
+    // Validar que conductor y vehículo pertenezcan al proveedor del pedido
+    // (evita asignaciones cruzadas entre inquilinos).
+    const orderSupplierId = order.rows[0].supplier_id;
+    if (driver_id) {
+      const driver = await query(
+        `SELECT u.id, u.supplier_id, r.name AS role_name
+         FROM users u JOIN roles r ON r.id = u.role_id
+         WHERE u.id = $1 AND u.is_active = TRUE`,
+        [Number(driver_id)]
+      );
+      if (!driver.rowCount || driver.rows[0].role_name !== 'domiciliario') {
+        return res.status(400).json({ error: 'El domiciliario seleccionado no existe o está inactivo' });
+      }
+      if (user.role !== 'admin' && Number(driver.rows[0].supplier_id) !== Number(orderSupplierId)) {
+        return res.status(403).json({ error: 'El domiciliario no pertenece al proveedor del pedido' });
+      }
+    }
+    if (vehicle_id) {
+      const vehicle = await query(
+        'SELECT id, supplier_id FROM vehicles WHERE id = $1 AND is_active = TRUE',
+        [Number(vehicle_id)]
+      );
+      if (!vehicle.rowCount) {
+        return res.status(400).json({ error: 'El vehículo seleccionado no existe o está inactivo' });
+      }
+      if (user.role !== 'admin' && Number(vehicle.rows[0].supplier_id) !== Number(orderSupplierId)) {
+        return res.status(403).json({ error: 'El vehículo no pertenece al proveedor del pedido' });
+      }
+    }
 
     // Verificar si ya existe una entrega para este pedido
     const existing = await query('SELECT * FROM deliveries WHERE order_id = $1', [order_id]);
@@ -281,43 +375,83 @@ router.post('/', roleRequired('proveedor_admin', 'admin', 'gerente'), async (req
       });
     }
 
-    emitDeliveryStatus(deliveryRow, { delivery_id: deliveryRow.id, status: deliveryRow.status, delivery_code: deliveryRow.delivery_code, restaurant_id: deliveryRow.restaurant_id, supplier_id: deliveryRow.order_supplier_id });
-    res.status(existing.rowCount ? 200 : 201).json(deliveryRow);
+    const fullDelivery = await query(`${deliverySelect()} WHERE d.id = $1`, [deliveryRow.id]);
+    const deliveryFull = fullDelivery.rows[0] ?? deliveryRow;
+    emitDeliveryStatus(deliveryFull, { delivery_id: deliveryFull.id, status: deliveryFull.status, delivery_code: deliveryFull.delivery_code, restaurant_id: deliveryFull.restaurant_id, supplier_id: deliveryFull.order_supplier_id });
+    res.status(existing.rowCount ? 200 : 201).json(redactDelivery(deliveryFull, user));
   } catch (err) {
     next(err);
   }
 });
 
 router.patch('/:id/assign', roleRequired('proveedor_admin', 'admin', 'gerente'), async (req, res, next) => {
+  let client;
   try {
     const user = req.user!;
-    const { driver_id } = req.body;
-    if (!driver_id) return res.status(400).json({ error: 'driver_id es requerido' });
+    const driverId = Number(req.body.driver_id);
+    const vehicleId = Number(req.body.vehicle_id);
+    if (!Number.isInteger(driverId) || driverId <= 0) {
+      return res.status(400).json({ error: 'Selecciona un domiciliario válido' });
+    }
+    if (!Number.isInteger(vehicleId) || vehicleId <= 0) {
+      return res.status(400).json({ error: 'Selecciona un vehículo válido' });
+    }
+
+    client = await pool.connect();
+    await client.query('BEGIN');
     const access = deliveryAccessWhere(user, 2);
-    const delivery = await query(`${deliverySelect()} WHERE d.id = $1${access.clause}`, [req.params.id, ...access.params]);
-    if (!delivery.rowCount) return res.status(404).json({ error: 'Entrega no encontrada o no autorizada' });
+    const delivery = await client.query(
+      `${deliverySelect()} WHERE d.id = $1${access.clause} FOR UPDATE OF d`,
+      [req.params.id, ...access.params]
+    );
+    if (!delivery.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Entrega no encontrada o no autorizada' });
+    }
     const del = delivery.rows[0];
-    const driver = await query(
+    const driver = await client.query(
       `SELECT u.*, r.name AS role_name FROM users u JOIN roles r ON r.id = u.role_id
        WHERE u.id = $1 AND u.is_active = TRUE`,
-      [driver_id]
+      [driverId]
     );
     if (!driver.rowCount) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ error: 'El usuario seleccionado no existe o está inactivo' });
     }
-    const driverRow = driver.rows[0];
-    if (driverRow.role_name !== 'domiciliario' && user.role !== 'admin') {
-      return res.status(400).json({ error: 'El usuario seleccionado no tiene rol de domiciliario' });
+    if (driver.rows[0].role_name !== 'domiciliario') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'El usuario seleccionado no tiene el rol de domiciliario' });
     }
-    if (user.supplier_id && driverRow.supplier_id && driverRow.supplier_id !== user.supplier_id) {
-      return res.status(403).json({ error: 'El domiciliario no pertenece a tu proveedor' });
+    if (user.role !== 'admin' && Number(driver.rows[0].supplier_id) !== Number(del.order_supplier_id)) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'El domiciliario no pertenece al proveedor del pedido' });
     }
-    const confirmationCode = del.confirmation_code || String(Math.floor(1000 + Math.random() * 9000));
-    const result = await query(
-      `UPDATE deliveries SET driver_id = $1, confirmation_code = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3 RETURNING *`,
-      [driver_id, confirmationCode, req.params.id]
+
+    const vehicle = await client.query(
+      `SELECT id FROM vehicles
+       WHERE id = $1 AND is_active = TRUE
+         AND ($2::boolean = TRUE OR supplier_id = $3)
+       FOR UPDATE`,
+      [vehicleId, user.role === 'admin', del.order_supplier_id]
     );
+    if (!vehicle.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'El vehículo no está activo o no pertenece al proveedor del pedido' });
+    }
+
+    const confirmationCode = del.confirmation_code || String(Math.floor(1000 + Math.random() * 9000));
+    await client.query(
+      `UPDATE vehicles SET driver_id = $1, driver_name = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3`,
+      [driverId, driver.rows[0].name, vehicleId]
+    );
+    const result = await client.query(
+      `UPDATE deliveries
+       SET driver_id = $1, vehicle_id = $2, confirmation_code = $3, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $4 RETURNING *`,
+      [driverId, vehicleId, confirmationCode, req.params.id]
+    );
+    await client.query('COMMIT');
 
     // Sincronizar estado del pedido a despachado si aún no lo estaba
     const currentOrder = await query('SELECT id, status, order_code FROM orders WHERE id = $1', [del.order_id]);
@@ -332,15 +466,26 @@ router.patch('/:id/assign', roleRequired('proveedor_admin', 'admin', 'gerente'),
       emitOrder('order:updated', updatedOrder.rows[0]);
     }
 
-    emitToUser('notification:created', driver_id, {
+    emitToUser('notification:created', driverId, {
       message: `Se te asignó la entrega ${del.delivery_code}`,
       delivery_id: del.id,
       confirmation_code: confirmationCode,
     });
-    emitDeliveryStatus(del, { delivery_id: del.id, status: result.rows[0].status, delivery_code: del.delivery_code, restaurant_id: del.restaurant_id, supplier_id: del.order_supplier_id });
-    res.json(result.rows[0]);
+    const assignedFull = await query(`${deliverySelect()} WHERE d.id = $1`, [del.id]);
+    const assignedRow = assignedFull.rows[0] ?? { ...del, status: result.rows[0].status };
+    emitDeliveryStatus(assignedRow, { delivery_id: del.id, status: result.rows[0].status, delivery_code: del.delivery_code, restaurant_id: del.restaurant_id, supplier_id: del.order_supplier_id });
+    res.json(redactDelivery(assignedRow, user));
   } catch (err) {
+    if (client) {
+      try {
+        await client.query('ROLLBACK');
+      } catch (rollbackError) {
+        console.error('Error revirtiendo la asignación de entrega:', rollbackError);
+      }
+    }
     next(err);
+  } finally {
+    client?.release();
   }
 });
 
@@ -354,15 +499,20 @@ router.patch('/:id/status', async (req, res, next) => {
     const delivery = await query(`${deliverySelect()} WHERE d.id = $1${access.clause}`, [req.params.id, ...access.params]);
     if (!delivery.rowCount) return res.status(404).json({ error: 'Entrega no encontrada' });
     const del = delivery.rows[0];
-    if (user.role === 'domiciliario' && !['en_camino', 'llegando', 'entregado'].includes(status)) {
-      return res.status(403).json({ error: 'El domiciliario solo puede cambiar a en_camino, llegando o entregado' });
+    if (user.role === 'domiciliario' && !['en_camino', 'llegando'].includes(status)) {
+      return res.status(403).json({ error: 'El domiciliario solo puede cambiar a en_camino o llegando' });
     }
-    if (status === 'entregado' && user.role === 'domiciliario') {
-      return res.status(400).json({ error: 'Usa POST /:id/confirm con el código de confirmación para entregar' });
+    if ((user.role === 'gerente' || user.role === 'empleado') && status !== 'fallido') {
+      return res.status(403).json({ error: 'El restaurante solo puede reportar la entrega como fallida' });
+    }
+    if (status === 'entregado' && user.role !== 'admin') {
+      return res.status(403).json({
+        error: 'La entrega solo se completa con el código de confirmación. Usa POST /:id/confirm.',
+      });
     }
     const deliveredSql = status === 'entregado' ? ', actual_delivery_time = CURRENT_TIMESTAMP' : '';
-    const result = await query(
-      `UPDATE deliveries SET status = $1, updated_at = CURRENT_TIMESTAMP${deliveredSql} WHERE id = $2 RETURNING *`,
+    await query(
+      `UPDATE deliveries SET status = $1, updated_at = CURRENT_TIMESTAMP${deliveredSql} WHERE id = $2`,
       [status, req.params.id]
     );
     if (status === 'en_camino') {
@@ -386,13 +536,55 @@ router.patch('/:id/status', async (req, res, next) => {
       emitOrder('order:updated', updated.rows[0]);
     }
     emitDeliveryStatus(del, { delivery_id: del.id, status, delivery_code: del.delivery_code, restaurant_id: del.restaurant_id, supplier_id: del.order_supplier_id });
-    res.json(result.rows[0]);
+    const statusFull = await query(`${deliverySelect()} WHERE d.id = $1`, [del.id]);
+    res.json(redactDelivery(statusFull.rows[0] ?? { ...del, status }, user));
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/:id/confirm', roleRequired('domiciliario', 'gerente', 'admin'), async (req, res, next) => {
+// Límite de intentos de la llave de entrega (anti fuerza bruta de 4 dígitos).
+// Se cuenta por usuario + entrega para no bloquear a otros usuarios legítimos.
+const confirmAttempts = new Map<string, { count: number; resetAt: number }>();
+const CONFIRM_MAX_ATTEMPTS = 5;
+const CONFIRM_WINDOW_MS = 10 * 60 * 1000;
+
+function confirmKey(userId: number, deliveryId: number): string {
+  return `${userId}:${deliveryId}`;
+}
+
+function checkConfirmRateLimit(userId: number, deliveryId: number): boolean {
+  const now = Date.now();
+  const key = confirmKey(userId, deliveryId);
+  const entry = confirmAttempts.get(key);
+  if (!entry || entry.resetAt <= now) {
+    confirmAttempts.set(key, { count: 0, resetAt: now + CONFIRM_WINDOW_MS });
+    return true;
+  }
+  return entry.count < CONFIRM_MAX_ATTEMPTS;
+}
+
+function registerConfirmFailure(userId: number, deliveryId: number): void {
+  const key = confirmKey(userId, deliveryId);
+  const entry = confirmAttempts.get(key);
+  if (entry) entry.count += 1;
+  else confirmAttempts.set(key, { count: 1, resetAt: Date.now() + CONFIRM_WINDOW_MS });
+  if (confirmAttempts.size > 5000) {
+    const now = Date.now();
+    for (const [mapKey, value] of confirmAttempts) {
+      if (value.resetAt <= now) confirmAttempts.delete(mapKey);
+    }
+  }
+}
+
+function codesMatch(expected: string, received: string): boolean {
+  const a = Buffer.from(String(expected).trim());
+  const b = Buffer.from(String(received).trim());
+  if (a.length !== b.length || a.length === 0) return false;
+  return timingSafeEqual(a, b);
+}
+
+router.post('/:id/confirm', roleRequired('gerente', 'empleado', 'admin'), async (req, res, next) => {
   try {
     const user = req.user!;
     const { confirmation_code } = req.body;
@@ -406,16 +598,21 @@ router.post('/:id/confirm', roleRequired('domiciliario', 'gerente', 'admin'), as
     if (del.status === 'entregado') {
       return res.status(400).json({ error: 'Esta entrega ya fue confirmada previamente' });
     }
-
-    // Validación estricta del código / llave de entrega
-    if (String(del.confirmation_code).trim() !== String(confirmation_code).trim()) {
-      return res.status(401).json({ error: 'Llave de entrega incorrecta. Verifica el código con el domiciliario.' });
+    if (!checkConfirmRateLimit(user.id, del.id)) {
+      return res.status(429).json({ error: 'Demasiados intentos fallidos. Espera unos minutos o solicita un nuevo código.' });
     }
 
-    const result = await query(
+    // Validación estricta del código / llave de entrega
+    if (!codesMatch(del.confirmation_code, confirmation_code)) {
+      registerConfirmFailure(user.id, del.id);
+      return res.status(401).json({ error: 'Llave de entrega incorrecta. Verifica el código con el domiciliario.' });
+    }
+    confirmAttempts.delete(confirmKey(user.id, del.id));
+
+    await query(
       `UPDATE deliveries SET status = 'entregado', actual_delivery_time = CURRENT_TIMESTAMP,
          updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 RETURNING *`,
+       WHERE id = $1`,
       [req.params.id]
     );
 
@@ -443,7 +640,7 @@ router.post('/:id/confirm', roleRequired('domiciliario', 'gerente', 'admin'), as
       });
     }
 
-    res.json({ message: 'Envío completado exitosamente con la llave de entrega', delivery: result.rows[0] });
+    res.json({ message: 'Envío completado exitosamente con la llave de entrega', delivery: redactDelivery({ ...del, status: 'entregado' }, user) });
   } catch (err) {
     next(err);
   }
@@ -646,19 +843,41 @@ router.get('/:id/track', async (req, res, next) => {
   }
 });
 
-router.post('/vehicles', roleRequired('proveedor_admin', 'admin', 'gerente'), async (req, res, next) => {
+router.post('/vehicles', roleRequired('proveedor_admin', 'admin'), async (req, res, next) => {
   try {
     const user = req.user!;
     const { name, plate, type, driver_id, imei } = req.body;
+    if (!name || !plate) return res.status(400).json({ error: 'name y plate son obligatorios' });
+    if (imei && String(imei).length > 20) return res.status(400).json({ error: 'imei inválido' });
+
+    const supplierId = user.role === 'admin' ? Number(req.body.supplier_id) : user.supplier_id;
+    if (!supplierId || !Number.isInteger(supplierId)) {
+      return res.status(400).json({ error: 'supplier_id es obligatorio para crear un vehículo' });
+    }
+    if (user.role === 'proveedor_admin' && Number(supplierId) !== Number(user.supplier_id)) {
+      return res.status(403).json({ error: 'No autorizado para crear vehículos de otro proveedor' });
+    }
+
     let driverName = req.body.driver_name || null;
     if (driver_id) {
-      const u = await query('SELECT name FROM users WHERE id = $1', [driver_id]).catch(() => ({ rows: [] }));
-      if (u.rows[0]) driverName = u.rows[0].name;
+      const u = await query(
+        `SELECT u.id, u.name, u.supplier_id, r.name AS role_name
+         FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1 AND u.is_active = TRUE`,
+        [Number(driver_id)]
+      );
+      if (!u.rowCount || u.rows[0].role_name !== 'domiciliario') {
+        return res.status(400).json({ error: 'El conductor debe ser un domiciliario activo' });
+      }
+      if (Number(u.rows[0].supplier_id) !== Number(supplierId)) {
+        return res.status(403).json({ error: 'El conductor no pertenece al proveedor' });
+      }
+      driverName = u.rows[0].name;
     }
+
     const result = await query(
       `INSERT INTO vehicles (supplier_id, name, plate, type, driver_id, driver_name, imei, gps_validated)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [user.supplier_id || null, name, plate, type ?? 'moto', driver_id ? Number(driver_id) : null, driverName, imei || null, Boolean(imei)]
+      [supplierId, name, plate, type ?? 'moto', driver_id ? Number(driver_id) : null, driverName, imei || null, Boolean(imei)]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -666,14 +885,35 @@ router.post('/vehicles', roleRequired('proveedor_admin', 'admin', 'gerente'), as
   }
 });
 
-router.put('/vehicles/:id', roleRequired('proveedor_admin', 'admin', 'gerente'), async (req, res, next) => {
+router.put('/vehicles/:id', roleRequired('proveedor_admin', 'admin'), async (req, res, next) => {
   try {
+    const user = req.user!;
     const { name, plate, type, driver_id, imei } = req.body;
+    if (imei && String(imei).length > 20) return res.status(400).json({ error: 'imei inválido' });
+
+    const vehicle = await query(
+      `SELECT id, supplier_id FROM vehicles
+       WHERE id = $1 AND ($2::boolean = TRUE OR supplier_id = $3)`,
+      [req.params.id, user.role === 'admin', user.supplier_id]
+    );
+    if (!vehicle.rowCount) return res.status(404).json({ error: 'Vehículo no encontrado' });
+
     let driverName = req.body.driver_name || null;
     if (driver_id) {
-      const u = await query('SELECT name FROM users WHERE id = $1', [driver_id]).catch(() => ({ rows: [] }));
-      if (u.rows[0]) driverName = u.rows[0].name;
+      const u = await query(
+        `SELECT u.id, u.name, u.supplier_id, r.name AS role_name
+         FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = $1 AND u.is_active = TRUE`,
+        [Number(driver_id)]
+      );
+      if (!u.rowCount || u.rows[0].role_name !== 'domiciliario') {
+        return res.status(400).json({ error: 'El conductor debe ser un domiciliario activo' });
+      }
+      if (Number(u.rows[0].supplier_id) !== Number(vehicle.rows[0].supplier_id)) {
+        return res.status(403).json({ error: 'El conductor no pertenece al proveedor del vehículo' });
+      }
+      driverName = u.rows[0].name;
     }
+
     const result = await query(
       `UPDATE vehicles
        SET name = COALESCE($1, name),
@@ -693,13 +933,15 @@ router.put('/vehicles/:id', roleRequired('proveedor_admin', 'admin', 'gerente'),
   }
 });
 
-router.patch('/vehicles/:id/gps', roleRequired('proveedor_admin', 'admin', 'gerente'), async (req, res, next) => {
+router.patch('/vehicles/:id/gps', roleRequired('proveedor_admin', 'admin'), async (req, res, next) => {
   try {
+    const user = req.user!;
     const { imei, gps_validated } = req.body;
+    if (imei && String(imei).length > 20) return res.status(400).json({ error: 'imei inválido' });
     const result = await query(
       `UPDATE vehicles SET imei = $1, gps_validated = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3 RETURNING *`,
-      [imei || null, Boolean(gps_validated), req.params.id]
+       WHERE id = $3 AND ($4::boolean = TRUE OR supplier_id = $5) RETURNING *`,
+      [imei || null, Boolean(gps_validated), req.params.id, user.role === 'admin', user.supplier_id]
     );
     if (!result.rowCount) return res.status(404).json({ error: 'Vehículo no encontrado' });
     res.json(result.rows[0]);
